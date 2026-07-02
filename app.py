@@ -23,7 +23,45 @@ import scorecard as SC
 import storage as ST
 import valuation as V
 
+try:
+    from lightweight_charts_v5 import lightweight_charts_v5_component
+    _TV_AVAILABLE = True
+except ImportError:  # 미설치 환경에선 plotly 차트로만 동작(폴백)
+    _TV_AVAILABLE = False
+
 st.set_page_config(page_title="StockManager", page_icon="📈", layout="wide")
+
+# 마이크로 애니메이션(metric 카드 페이드인·hover, progress bar 부드러운 채움) —
+# Robinhood 다크 테마(.streamlit/config.toml)에 얹는 순수 CSS. JS/컴포넌트 불필요.
+st.markdown("""
+<style>
+div[data-testid="stMetric"] {
+    animation: sm-fade-in 0.35s ease-out;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    border-radius: 10px;
+    padding: 6px 8px;
+}
+div[data-testid="stMetric"]:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 14px rgba(0, 200, 5, 0.12);
+}
+div[data-testid="stDataFrame"], div[data-testid="stExpander"] {
+    animation: sm-fade-in 0.4s ease-out;
+}
+div[role="progressbar"] > div { transition: width 0.6s ease; }
+button[kind="primary"], button[kind="secondary"] {
+    transition: transform 0.1s ease, box-shadow 0.15s ease;
+}
+button[kind="primary"]:hover, button[kind="secondary"]:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 10px rgba(0, 200, 5, 0.18);
+}
+@keyframes sm-fade-in {
+    from { opacity: 0; transform: translateY(4px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+</style>
+""", unsafe_allow_html=True)
 
 # Neon(무료 Postgres) 등 st.secrets["DATABASE_URL"]이 설정돼 있으면 자동으로 영구 저장
 # 백엔드로 전환된다(storage.py는 streamlit 비의존이라 여기서 값을 주입해준다).
@@ -354,11 +392,14 @@ def render_dashboard():
             mkt_val = pos["shares"] * price
             if pos["avg_price"]:
                 pl_pct = (price - pos["avg_price"]) / pos["avg_price"] * 100
+        hist = cached_history(sym, "1mo", "1d")
+        spark = hist["Close"].tolist() if hist is not None and not hist.empty else []
         rows.append({
             "티커": sym,
             "분류": "장기" if t["kind"] == "long" else "스윙",
             "현재가": price,
             "등락%": q.get("change_pct"),
+            "30일 추이": spark,
             "점수": total,
             "판정": verdict,
             "보유주": pos["shares"] if pos["shares"] else None,
@@ -386,6 +427,7 @@ def render_dashboard():
         column_config={
             "현재가": st.column_config.NumberColumn(format="$%.2f"),
             "등락%": st.column_config.NumberColumn(format="%.2f%%"),
+            "30일 추이": st.column_config.LineChartColumn(width="small"),
             "점수": st.column_config.ProgressColumn(min_value=0, max_value=100,
                                                   format="%.1f"),
             "평단": st.column_config.NumberColumn(format="$%.2f"),
@@ -476,14 +518,18 @@ def render_chart(sym: str):
     if gh3.button("❔ Guide", key=f"g_chart_{sym}", use_container_width=True,
                   help="차트 보는 법 설명"):
         show_guide("chart")
-    c1, c2, c3 = st.columns([2.2, 3.4, 1.4])
+    c1, c2, c3, c4 = st.columns([2.0, 3.0, 1.3, 1.3])
     gran = c1.segmented_control("차트 종류", ["라인", "일봉", "주봉", "월봉"],
                                 default="라인", key=f"gran_{sym}") or "라인"
     opts = _RANGE_OPTS[gran]
     default_rng = opts[len(opts) // 2] if gran != "라인" else "1Y"
     rng = c2.segmented_control("기간", opts, default=default_rng,
                                key=f"rng_{sym}") or opts[0]
-    live = c3.toggle("🔴 실시간", key=f"live_{sym}",
+    dynamic = c3.toggle("✨ 다이나믹", value=_TV_AVAILABLE, key=f"dyn_{sym}",
+                        disabled=not _TV_AVAILABLE,
+                        help="증권앱 느낌의 부드러운 실시간 차트(TradingView). "
+                             "끄면 기존 분석용 차트(plotly)로 봅니다.") if _TV_AVAILABLE else False
+    live = c4.toggle("🔴 실시간", key=f"live_{sym}",
                      help="30초마다 차트만 자동 갱신 (전체 새로고침 없음)")
 
     yperiod, interval, mode = _resolve_period_interval(gran, rng)
@@ -500,9 +546,16 @@ def render_chart(sym: str):
         if df is None or df.empty:
             st.info("이 조합의 가격 데이터를 불러올 수 없습니다. 기간/종류를 바꿔보세요.")
             return
-        fig = CH.build_figure(df, mode, interval=interval, catalysts=catalysts,
-                              show_trend=show_trend, show_volume=show_volume)
-        st.plotly_chart(fig, use_container_width=True, key=f"plt_{sym}")
+        if dynamic:
+            panes = CH.build_tv_panes(df, mode, interval=interval, catalysts=catalysts,
+                                      show_trend=show_trend, show_volume=show_volume)
+            total_height = sum(p.get("height", 300) for p in panes) or 440
+            lightweight_charts_v5_component(name=sym, charts=panes,
+                                            height=total_height, key=f"tv_{sym}")
+        else:
+            fig = CH.build_figure(df, mode, interval=interval, catalysts=catalysts,
+                                  show_trend=show_trend, show_volume=show_volume)
+            st.plotly_chart(fig, use_container_width=True, key=f"plt_{sym}")
         if live:
             st.caption(f"🔴 실시간 갱신 중 · 마지막 {dt.datetime.now():%H:%M:%S} "
                        f"(데이터 ~1분 지연)")

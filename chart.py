@@ -238,6 +238,122 @@ def build_figure(df: pd.DataFrame, mode: str = "line", *,
     return fig
 
 
+# ============================================================ TradingView(다이나믹) 차트
+# streamlit-lightweight-charts-v5 컴포넌트용 pane/series JSON 변환.
+# 기존 plotly build_figure()의 추세탐지·촉매매칭 로직을 그대로 재사용해 두 렌더러가
+# 같은 데이터로 일치된 결과를 보여주게 한다.
+TV_DARK_THEME = {
+    "layout": {"background": {"color": "#0B0D10"}, "textColor": "#D1D4DC"},
+    "grid": {"vertLines": {"color": "rgba(255,255,255,0.06)"},
+             "horzLines": {"color": "rgba(255,255,255,0.06)"}},
+    "timeScale": {"borderColor": "rgba(255,255,255,0.12)"},
+    "rightPriceScale": {"borderColor": "rgba(255,255,255,0.12)"},
+}
+
+_INTRADAY_INTERVALS = ("1m", "2m", "5m", "15m", "30m", "60m", "90m", "1h")
+
+
+def _tv_time(ts, intraday: bool):
+    if intraday:
+        t = ts.tz_convert("UTC") if getattr(ts, "tzinfo", None) is not None else ts
+        return int(t.timestamp())
+    return ts.strftime("%Y-%m-%d")
+
+
+def _tv_price_series(df: pd.DataFrame, mode: str, intraday: bool) -> dict:
+    if mode == "candle":
+        data = [{"time": _tv_time(idx, intraday), "open": float(o), "high": float(h),
+                 "low": float(l), "close": float(c)}
+                for idx, o, h, l, c in zip(df.index, df["Open"], df["High"],
+                                           df["Low"], df["Close"])]
+        return {"type": "Candlestick", "data": data,
+                "options": {"upColor": GREEN, "downColor": RED, "borderVisible": False,
+                            "wickUpColor": GREEN, "wickDownColor": RED,
+                            "priceLineVisible": False}}
+    col = _period_color(df)
+    top = "rgba(0,200,5,0.28)" if col == GREEN else "rgba(255,80,0,0.28)"
+    bottom = "rgba(0,200,5,0.0)" if col == GREEN else "rgba(255,80,0,0.0)"
+    data = [{"time": _tv_time(idx, intraday), "value": float(c)}
+            for idx, c in zip(df.index, df["Close"])]
+    return {"type": "Area", "data": data,
+            "options": {"lineColor": col, "topColor": top, "bottomColor": bottom,
+                        "lineWidth": 2, "priceLineVisible": False}}
+
+
+def _tv_sma_series(df: pd.DataFrame, window: int, color: str, intraday: bool) -> dict:
+    sma = df["Close"].rolling(window).mean()
+    data = [{"time": _tv_time(idx, intraday), "value": float(v)}
+            for idx, v in zip(df.index, sma) if pd.notna(v)]
+    return {"type": "Line", "data": data,
+            "options": {"color": color, "lineWidth": 1, "priceLineVisible": False}}
+
+
+def _tv_markers(changes: list[dict], matched: list[dict], intraday: bool) -> list[dict]:
+    markers = []
+    for c in changes:
+        markers.append({
+            "time": _tv_time(c["date"], intraday),
+            "position": "belowBar" if c["type"] == "up" else "aboveBar",
+            "color": GREEN if c["type"] == "up" else RED,
+            "shape": "arrowUp" if c["type"] == "up" else "arrowDown",
+            "text": "상승전환" if c["type"] == "up" else "하락전환",
+        })
+    for m in matched:
+        markers.append({
+            "time": _tv_time(m["x"], intraday),
+            "position": "aboveBar" if m["kind"] == "호재" else "belowBar",
+            "color": GREEN if m["kind"] == "호재" else RED,
+            "shape": "circle",
+            "text": f"★ {m['headline'][:24]}",
+        })
+    markers.sort(key=lambda x: x["time"])
+    return markers
+
+
+def _tv_volume_pane(df: pd.DataFrame, mode: str, intraday: bool, height: int = 110) -> dict:
+    if mode == "candle" and "Open" in df.columns:
+        colors = [GREEN if c >= o else RED for o, c in zip(df["Open"], df["Close"])]
+    else:
+        close = df["Close"]
+        colors = [GREEN] + [GREEN if close.iloc[i] >= close.iloc[i - 1] else RED
+                            for i in range(1, len(close))]
+    data = [{"time": _tv_time(idx, intraday), "value": float(v), "color": col}
+            for idx, v, col in zip(df.index, df["Volume"].fillna(0), colors)]
+    return {"chart": TV_DARK_THEME, "series": [{
+        "type": "Histogram", "data": data,
+        "options": {"priceFormat": {"type": "volume"}, "priceLineVisible": False},
+        "priceScale": {"scaleMargins": {"top": 0.2, "bottom": 0}},
+    }], "height": height, "title": "거래량"}
+
+
+def build_tv_panes(df: pd.DataFrame, mode: str = "line", *, interval: str = "1d",
+                   catalysts: list[dict] | None = None, show_trend: bool = True,
+                   show_volume: bool = False, price_height: int = 440) -> list[dict]:
+    """streamlit-lightweight-charts-v5 `charts=` 인자로 바로 넘길 수 있는 pane 리스트.
+    빈 데이터면 빈 리스트(호출부에서 '데이터 없음' 처리)."""
+    if df is None or df.empty:
+        return []
+    intraday = interval in _INTRADAY_INTERVALS
+    catalysts = catalysts or []
+    short, long = sma_windows_for(interval)
+    changes = detect_trend_changes(df, short, long) if show_trend else []
+    matched = _match_catalysts(df, catalysts)
+
+    series = [_tv_price_series(df, mode, intraday)]
+    if mode == "candle":
+        series.append(_tv_sma_series(df, short, "#7AA2FF", intraday))
+        series.append(_tv_sma_series(df, long, "#FFB020", intraday))
+    if show_trend:
+        markers = _tv_markers(changes, matched, intraday)
+        if markers:
+            series[0]["markers"] = markers
+
+    panes = [{"chart": TV_DARK_THEME, "series": series, "height": price_height, "title": ""}]
+    if show_volume and "Volume" in df.columns and not df["Volume"].isna().all():
+        panes.append(_tv_volume_pane(df, mode, intraday))
+    return panes
+
+
 def _recent_cross(close: pd.Series, sw: int, lw: int, recent: int = 7) -> dict | None:
     """단기SMA(sw) vs 장기SMA(lw)의 최근 골든/데드크로스. 없으면 None."""
     if close is None or len(close) < lw + 2:

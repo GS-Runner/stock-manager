@@ -6,3 +6,4 @@ openpyxl>=3.1
 psycopg2-binary>=2.9
 vaderSentiment>=3.3
 pytrends>=4.9
+streamlit-lightweight-charts-v5>=0.1.8

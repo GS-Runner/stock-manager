@@ -126,6 +126,35 @@ def test_latest_signal():
     print(f"  [ok] latest_signal: trend={sig['trend']}, recent={sig['recent'] is not None}")
 
 
+def test_build_tv_panes_line_and_candle():
+    df = _synthetic()
+    cats = [{"date": "2024-04-01", "kind": "호재", "headline": "신제품", "note": "",
+             "reflected_pct": 30}]
+    line_panes = CH.build_tv_panes(df, "line", interval="1d", catalysts=cats)
+    candle_panes = CH.build_tv_panes(df, "candle", interval="1d", catalysts=cats)
+    assert len(line_panes) == 1, "거래량 미지정 시 가격 pane 1개여야 함"
+    assert line_panes[0]["series"][0]["type"] == "Area"
+    assert len(candle_panes[0]["series"]) == 3, "캔들모드는 가격+SMA2개 = 3 series"
+    assert candle_panes[0]["series"][0]["type"] == "Candlestick"
+    # 촉매 마커가 첫 series에 붙었는지
+    assert "markers" in line_panes[0]["series"][0]
+    assert any(m["text"].startswith("★") for m in line_panes[0]["series"][0]["markers"])
+    print(f"  [ok] TV panes: line 1개 series타입=Area, candle 3 series(가격+SMA2), 마커 포함")
+
+
+def test_build_tv_panes_volume_and_empty():
+    df = _synthetic()
+    df["Volume"] = np.random.RandomState(2).randint(1e6, 5e6, len(df))
+    panes = CH.build_tv_panes(df, "candle", interval="1d", show_volume=True)
+    assert len(panes) == 2, "거래량 ON이면 pane 2개(가격+거래량)"
+    assert panes[1]["series"][0]["type"] == "Histogram"
+    assert panes[1]["series"][0]["data"][0]["color"] in (CH.GREEN, CH.RED)
+    panes_off = CH.build_tv_panes(df, "candle", interval="1d", show_volume=False)
+    assert len(panes_off) == 1
+    assert CH.build_tv_panes(pd.DataFrame(), "line") == []
+    print("  [ok] TV panes: 거래량 ON→2pane/OFF→1pane, 빈데이터→[]")
+
+
 def test_trend_summary():
     df = _synthetic()
     cats = [{"date": "2024-03-20", "kind": "악재", "headline": "하향", "note": "",

@@ -105,18 +105,25 @@ assert "뉴스 버즈" in labels and "헤드라인 톤" in labels and "애널리
 print(f"   [ok] 상세 페이지 예외 없음. 탭 {len(at.tabs)}개, metric {len(at.metric)}개 렌더")
 print(f"   주요 metric 일부: {[l for l in labels if l in ('Forward P/E','P/B','P/S','EV/EBITDA','주당 내재가치','내재 FCF 성장률')]}")
 
-print("3) 차트: 일봉(캔들)+실시간 ON, 월봉 경로 실행...")
+print("3) 차트: 일봉(캔들)+실시간 ON(다이나믹 TradingView 기본값), 월봉 경로 실행...")
 assert at.segmented_control, "차트 컨트롤(segmented_control) 미렌더"
 sym = at.segmented_control[0].key.replace("gran_", "")
+assert at.toggle(key=f"dyn_{sym}").value is True, "다이나믹(TradingView) 차트 기본값이 ON이 아님"
 at.segmented_control(key=f"gran_{sym}").set_value("일봉")
 at.toggle(key=f"live_{sym}").set_value(True)
 at.run(timeout=120)
-assert not at.exception, f"일봉/실시간 예외: {at.exception}"
+assert not at.exception, f"일봉/실시간(다이나믹) 예외: {at.exception}"
 at.segmented_control(key=f"gran_{sym}").set_value("월봉")
 at.toggle(key=f"live_{sym}").set_value(False)
 at.run(timeout=120)
-assert not at.exception, f"월봉 예외: {at.exception}"
-print(f"   [ok] {sym} 일봉+실시간 / 월봉 렌더 예외 없음")
+assert not at.exception, f"월봉(다이나믹) 예외: {at.exception}"
+print(f"   [ok] {sym} 일봉+실시간 / 월봉 렌더 예외 없음 (TradingView 컴포넌트)")
+
+print("3.5) 다이나믹 OFF → 기존 plotly 폴백 차트 경로 실행...")
+at.toggle(key=f"dyn_{sym}").set_value(False)
+at.run(timeout=120)
+assert not at.exception, f"plotly 폴백 예외: {at.exception}"
+print("   [ok] 다이나믹 OFF 시 plotly 차트 렌더 예외 없음")
 
 print("4) 스캐너 페이지 실행...")
 at.radio(key="page_nav").set_value("🔎 스캐너").run(timeout=120)
