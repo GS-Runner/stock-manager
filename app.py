@@ -378,6 +378,7 @@ def render_dashboard():
         return
 
     rows = []
+    invested = 0.0
     for t in tickers:
         sym = t["symbol"]
         q = cached_quote(sym)
@@ -390,10 +391,13 @@ def render_dashboard():
         mkt_val = None
         if pos["shares"] > 0 and price:
             mkt_val = pos["shares"] * price
+            invested += mkt_val
             if pos["avg_price"]:
                 pl_pct = (price - pos["avg_price"]) / pos["avg_price"] * 100
         hist = cached_history(sym, "1mo", "1d")
         spark = hist["Close"].tolist() if hist is not None and not hist.empty else []
+        # NumberColumn은 결측값을 "None" 텍스트로 그대로 보여줌(glide-data-grid 특성) —
+        # 미보유 종목처럼 값이 없는 게 정상인 열은 미리 "—"로 포맷한 문자열로 넣는다.
         rows.append({
             "티커": sym,
             "분류": "장기" if t["kind"] == "long" else "스윙",
@@ -402,15 +406,14 @@ def render_dashboard():
             "30일 추이": spark,
             "점수": total,
             "판정": verdict,
-            "보유주": pos["shares"] if pos["shares"] else None,
-            "평단": pos["avg_price"] if pos["shares"] else None,
-            "평가액": mkt_val,
-            "손익%": pl_pct,
+            "보유주": f"{pos['shares']:.0f}" if pos["shares"] else "—",
+            "평단": fmt_money(pos["avg_price"]) if pos["shares"] else "—",
+            "평가액": fmt_money(mkt_val),
+            "손익%": f"{pl_pct:+.2f}%" if pl_pct is not None else "—",
         })
     df = pd.DataFrame(rows)
 
     # 요약 메트릭
-    invested = sum((r["평가액"] or 0) for r in rows)
     c1, c2, c3 = st.columns(3)
     c1.metric("등록 종목", f"{len(rows)} 개")
     c2.metric("보유 평가액", fmt_money(invested) if invested else "—")
@@ -430,9 +433,6 @@ def render_dashboard():
             "30일 추이": st.column_config.LineChartColumn(width="small"),
             "점수": st.column_config.ProgressColumn(min_value=0, max_value=100,
                                                   format="%.1f"),
-            "평단": st.column_config.NumberColumn(format="$%.2f"),
-            "평가액": st.column_config.NumberColumn(format="$%.0f"),
-            "손익%": st.column_config.NumberColumn(format="%.2f%%"),
         },
     )
     if event.selection.rows:
