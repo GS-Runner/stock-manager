@@ -17,6 +17,7 @@ import chart as CH
 import export as EXP
 import guides as GD
 import market as MK
+import narrative as NA
 import scenarios as SN
 import scorecard as SC
 import storage as ST
@@ -123,6 +124,17 @@ def cached_history_live(symbol: str, period: str, interval: str):
 @st.cache_data(ttl=900, show_spinner=False)
 def cached_news(symbol: str):
     return MK.get_recent_news(symbol)
+
+
+@st.cache_data(ttl=3600 * 6, show_spinner=False)
+def cached_analyst_recs(symbol: str):
+    return MK.get_analyst_recommendations(symbol)
+
+
+@st.cache_data(ttl=3600 * 12, show_spinner=False)
+def cached_search_interest(keyword: str):
+    r = NA.search_interest(keyword)
+    return r.to_dict() if r is not None else None
 
 
 # ---------------------------------------------------------------- 포맷 헬퍼
@@ -406,7 +418,7 @@ def render_detail(sym: str):
     h4.metric("애널 목표가", fmt_money(f.get("target_mean")))
 
     tabs = st.tabs(["📈 개요/Live", "📋 스코어카드", "🧮 밸류에이션·DCF",
-                    "🎯 시나리오", "📰 촉매 반영", "💰 매매기록"])
+                    "🎯 시나리오", "📰 뉴스·Narrative", "🗒️ 촉매 반영", "💰 매매기록"])
 
     with tabs[0]:
         render_overview(sym, f, q)
@@ -417,8 +429,10 @@ def render_detail(sym: str):
     with tabs[3]:
         render_scenarios(sym, f, price)
     with tabs[4]:
-        render_catalysts(sym, price)
+        render_narrative(sym, price)
     with tabs[5]:
+        render_catalysts(sym, price)
+    with tabs[6]:
         render_trades(sym, price)
 
     st.divider()
@@ -1034,23 +1048,62 @@ def render_scenarios(sym, f, price):
         st.rerun()
 
 
-def render_catalysts(sym, price):
-    guide_header("📰 촉매(호재/악재) 반영 추적", "catalysts", key=f"g_cat_{sym}")
-    st.caption("현재가가 최근 호재/악재를 얼마나 반영했는지 본인 평가로 기록·분석.")
+def render_narrative(sym, price):
+    guide_header("📰 뉴스 · Narrative", "narrative", key=f"g_narr_{sym}")
+    st.caption("이 종목을 둘러싼 '이야기'가 뜨거워지는지 식는지 무료 데이터로 살펴봅니다.")
 
-    with st.expander("📡 최근 뉴스 헤드라인 (Yahoo)"):
-        news = cached_news(sym)
-        if news:
-            for n in news:
+    news = cached_news(sym)
+    narr = NA.news_narrative(news)
+    n1, n2, n3 = st.columns(3)
+    if narr["available"]:
+        n1.metric("뉴스 버즈", f"{narr['buzz']}/100", help="수집 한도 대비 현재 노출량")
+        n2.metric("헤드라인 톤", f"{narr['sentiment']:+d}", narr["label"],
+                  help="-100(매우부정)~+100(매우긍정)")
+    else:
+        n1.metric("뉴스 버즈", "—")
+        n2.metric("헤드라인 톤", "—")
+
+    recs = cached_analyst_recs(sym)
+    am = NA.analyst_momentum(recs)
+    if am["available"]:
+        n3.metric("애널리스트 모멘텀", am["trend"], f"{am['delta']:+.2f}",
+                  help="최근 수개월 컨센서스 변화(+면 강세로 이동)")
+    else:
+        n3.metric("애널리스트 모멘텀", "—")
+
+    si = cached_search_interest(sym)
+    if si:
+        with st.expander("🔍 Google 검색 관심도 (최근 12개월)"):
+            st.line_chart(si)
+            st.caption("비공식 데이터 소스라 가끔 조회에 실패할 수 있습니다(정상).")
+
+    with st.expander("📡 최근 뉴스 헤드라인 (Yahoo)", expanded=True):
+        if narr["available"]:
+            for i, n in enumerate(narr["articles"]):
                 t = n.get("title")
                 link = n.get("link")
                 pub = n.get("publisher") or ""
+                s = n.get("sentiment", 0.0)
+                tone = "🟢" if s > 0.15 else ("🔴" if s < -0.15 else "⚪")
+                nc1, nc2 = st.columns([6, 1])
                 if link:
-                    st.markdown(f"- [{t}]({link})  ·  _{pub}_")
+                    nc1.markdown(f"{tone} [{t}]({link})  ·  _{pub}_")
                 else:
-                    st.markdown(f"- {t}  ·  _{pub}_")
+                    nc1.markdown(f"{tone} {t}  ·  _{pub}_")
+                if nc2.button("⭐ 촉매로 기록", key=f"quickcat_{sym}_{i}"):
+                    kind = "악재" if s < 0 else "호재"
+                    ST.add_catalyst(sym, str(dt.date.today()), kind, t,
+                                    float(price or 0), 0, 50, "뉴스에서 원클릭 기록",
+                                    db_path=current_db())
+                    st.success("촉매로 기록했습니다 — 아래 목록에서 반영도를 조정하세요.")
+                    st.rerun()
         else:
             st.write("뉴스 없음.")
+
+
+def render_catalysts(sym, price):
+    guide_header("📰 촉매(호재/악재) 반영 추적", "catalysts", key=f"g_cat_{sym}")
+    st.caption("현재가가 최근 호재/악재를 얼마나 반영했는지 본인 평가로 기록·분석.")
 
     with st.form(f"cat_{sym}", clear_on_submit=True):
         c1, c2, c3 = st.columns(3)

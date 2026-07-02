@@ -98,6 +98,17 @@ def get_history(symbol: str, period: str = "1y", interval: str = "1d"):
         return pd.DataFrame()
 
 
+def get_analyst_recommendations(symbol: str) -> list[dict]:
+    """최근 수개월 애널리스트 추천 분포(월별 strongBuy/buy/hold/sell/strongSell 카운트).
+    narrative.analyst_momentum()의 입력으로 쓰인다."""
+    t = yf.Ticker(symbol)
+    try:
+        df = t.recommendations
+        return df.to_dict("records") if df is not None and not df.empty else []
+    except Exception:
+        return []
+
+
 def get_recent_news(symbol: str, limit: int = 8) -> list[dict]:
     """최근 뉴스 헤드라인(촉매 기록 참고용)."""
     t = yf.Ticker(symbol)

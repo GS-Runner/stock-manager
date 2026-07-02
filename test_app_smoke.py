@@ -95,11 +95,13 @@ print("2) 종목 상세 페이지로 전환 후 실행...")
 # 페이지 라디오(key=page_nav)를 '종목 상세'로 변경 — 모든 탭 본문이 실행된다
 at.radio(key="page_nav").set_value("🔍 종목 상세").run(timeout=120)
 assert not at.exception, f"상세 페이지 예외: {at.exception}"
-assert len(at.tabs) >= 6, f"탭이 렌더되지 않음 (탭 수={len(at.tabs)}) — 상세 페이지 미실행"
+assert len(at.tabs) >= 7, f"탭이 렌더되지 않음 (탭 수={len(at.tabs)}) — 상세 페이지 미실행"
 labels = [m.label for m in at.metric]
 assert "Forward P/E" in labels, f"개요 탭 metric 미렌더: {labels[:10]}"
 assert "주당 내재가치" in labels, "DCF 탭 미렌더"
 assert "확률가중 기대 목표주가" in labels, f"시나리오 탭 미렌더: {labels[:20]}"
+assert "뉴스 버즈" in labels and "헤드라인 톤" in labels and "애널리스트 모멘텀" in labels, \
+    f"뉴스·Narrative 탭 미렌더: {labels[:20]}"
 print(f"   [ok] 상세 페이지 예외 없음. 탭 {len(at.tabs)}개, metric {len(at.metric)}개 렌더")
 print(f"   주요 metric 일부: {[l for l in labels if l in ('Forward P/E','P/B','P/S','EV/EBITDA','주당 내재가치','내재 FCF 성장률')]}")
 
