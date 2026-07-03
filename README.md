@@ -142,7 +142,7 @@ streamlit run app.py         # 터미널
 
 ## 테스트
 ```
-python test_core.py        # 핵심 로직(DCF/역DCF/스코어/자동채움/저장소/계정인증/PG어댑터/엑셀) 18개
+python test_core.py        # 핵심 로직(DCF/역DCF/스코어/자동채움/저장소/계정인증/PG SQL정적검사/엑셀) 20개
 python test_scenarios.py   # 시나리오 케이스 빌더(투영/목표주가/blended/저장) 8개
 python test_chart.py       # 추세탐지/구간/촉매/거래량패널/스캐너신호/이동평균분석/TV차트패널/차트 11개
 python test_narrative.py   # 뉴스버즈/헤드라인톤/애널리스트모멘텀/검색관심도 안전성 5개

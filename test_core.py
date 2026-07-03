@@ -200,6 +200,31 @@ def test_user_isolation_and_backup():
     print("  [ok] 사용자별 DB 격리, 백업/복원, 손상파일 거부")
 
 
+def test_add_ticker_idempotent():
+    """같은 티커를 두 번 추가해도 중복/에러 없이 무시돼야 함(ON CONFLICT DO NOTHING)."""
+    fd, path = tempfile.mkstemp(suffix=".db")
+    os.close(fd)
+    try:
+        ST.init_db(path)
+        ST.add_ticker("AAPL", "Apple", "long", db_path=path)
+        ST.add_ticker("AAPL", "Apple Inc.", "swing", db_path=path)  # 재추가 — 무시돼야
+        tks = ST.list_tickers(path)
+        assert len(tks) == 1, f"중복 추가로 행이 늘어남: {tks}"
+        assert tks[0]["name"] == "Apple", "재추가 시 기존 값이 덮어써짐(IGNORE가 아님)"
+        print("  [ok] 티커 재추가는 무시됨(중복 없음, 기존 값 유지)")
+    finally:
+        os.unlink(path)
+
+
+def test_storage_sql_no_sqlite_only_syntax():
+    """storage.py 실행SQL에 Postgres에서 깨지는 SQLite 전용 문법이 없는지 정적 검사.
+    (Neon 배포 시 psycopg2.errors.SyntaxError로 터진 실사고 사례 재발 방지)"""
+    src = open(os.path.join(os.path.dirname(__file__), "storage.py"), encoding="utf-8").read()
+    assert "INSERT OR" not in src, "SQLite 전용 'INSERT OR ...' 구문이 남아있음(Postgres에서 SyntaxError)"
+    assert "REPLACE INTO" not in src, "SQLite 전용 'REPLACE INTO' 구문이 남아있음(Postgres 미지원)"
+    print("  [ok] SQLite 전용 SQL 문법 없음(INSERT OR / REPLACE INTO)")
+
+
 def test_auth():
     """계정 생성/검증 — scrypt 해시, 이름 중복 방지, 오답 비밀번호 거부."""
     import tempfile

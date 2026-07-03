@@ -283,7 +283,8 @@ def add_ticker(symbol: str, name: str, kind: str = "long", db_path: str = DB_PAT
     symbol = symbol.upper().strip()
     with _conn(db_path) as con:
         con.execute(
-            "INSERT OR IGNORE INTO tickers(symbol, name, kind, added_at) VALUES (?,?,?,?)",
+            "INSERT INTO tickers(symbol, name, kind, added_at) VALUES (?,?,?,?) "
+            "ON CONFLICT(symbol) DO NOTHING",
             (symbol, name, kind, _now()),
         )
 
