@@ -381,29 +381,43 @@ _BGM_HTML = """
 """
 
 # ─── 로그인/회원가입 성공 시 전체화면 로딩 연출 (순수 HTML/CSS/SVG — JS 불필요) ───
-# 화성 느낌의 붉은 행성 + 별빛 우주 배경 위로, 위아래로 튀며 우상향하는 차트 라인이
-# SVG <animateMotion>(SMIL, 스크립트 없이 브라우저가 직접 실행)으로 그려진다.
-_CHART_PATH_D = ("M0,150 L36,110 L72,128 L108,80 L144,102 L180,58 "
-                  "L216,78 L252,34 L288,54 L324,14 L360,30 L396,-4")
-_LOGIN_LOADING_HTML = f"""
-<div class="sm-loading-overlay">
+# 화성 느낌의 붉은 행성 + 별빛 우주 배경 위로, 로켓이 위아래로 지그재그 튀며 우상향하는
+# 차트 라인을 따라 "슈우웅" 날아간다. SVG <animateMotion>(SMIL, 스크립트 없이 브라우저가
+# 직접 실행 — rotate="auto"로 진행 방향에 맞춰 로켓이 기울어진다)으로 구현.
+_CHART_PATH_D = ("M0,210 L60,120 L120,165 L180,60 L240,110 L300,-10 "
+                  "L360,55 L420,-90 L470,-40 L500,-130")
+_LOGIN_LOADING_HTML_TMPL = f"""
+<div class="sm-loading-overlay %%CLS%%">
   <div class="sm-loading-planet"></div>
-  <svg class="sm-loading-chart" viewBox="0 -20 400 176" preserveAspectRatio="none">
+  <svg class="sm-loading-chart" viewBox="-20 -150 560 380" preserveAspectRatio="xMidYMid meet">
     <defs>
       <linearGradient id="sm-chart-grad" x1="0" y1="0" x2="1" y2="0">
         <stop offset="0%" stop-color="#FF8A65"/>
         <stop offset="50%" stop-color="#A78BFA"/>
         <stop offset="100%" stop-color="#00E68A"/>
       </linearGradient>
+      <marker id="sm-arrowhead" markerWidth="10" markerHeight="10" refX="3" refY="5" orient="auto">
+        <path d="M0,0 L7,5 L0,10 Z" fill="#00E68A"/>
+      </marker>
     </defs>
     <path d="{_CHART_PATH_D}" fill="none" stroke="url(#sm-chart-grad)"
-          stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"
-          pathLength="1000" class="sm-loading-path"/>
-    <circle r="6" fill="#EDEBF5" class="sm-loading-dotmark">
-      <animateMotion dur="2.4s" repeatCount="indefinite" path="{_CHART_PATH_D}"/>
+          stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round"
+          pathLength="1000" class="sm-loading-path" marker-end="url(#sm-arrowhead)"/>
+    <circle r="5" fill="#A78BFA" opacity="0.55" class="sm-loading-trail">
+      <animateMotion dur="1.5s" repeatCount="indefinite" begin="-0.28s" path="{_CHART_PATH_D}"/>
     </circle>
+    <circle r="4" fill="#EDEBF5" opacity="0.35" class="sm-loading-trail">
+      <animateMotion dur="1.5s" repeatCount="indefinite" begin="-0.16s" path="{_CHART_PATH_D}"/>
+    </circle>
+    <text font-size="34" text-anchor="middle" dominant-baseline="middle" class="sm-loading-rocket">
+      🚀
+      <animateMotion dur="1.5s" repeatCount="indefinite" rotate="auto" path="{_CHART_PATH_D}"/>
+    </text>
   </svg>
-  <div class="sm-loading-text">차트를 생성중입니다<span class="sm-loading-dot">.</span><span class="sm-loading-dot">.</span><span class="sm-loading-dot">.</span></div>
+  <div class="sm-loading-text">
+    <div class="sm-loading-title">LET'S GET RICH 🚀</div>
+    <div class="sm-loading-sub">Launching your portfolio<span class="sm-loading-dot">.</span><span class="sm-loading-dot">.</span><span class="sm-loading-dot">.</span></div>
+  </div>
 </div>
 <style>
   .sm-loading-overlay {{
@@ -413,6 +427,10 @@ _LOGIN_LOADING_HTML = f"""
                   radial-gradient(ellipse at 82% 88%, rgba(255,111,74,0.14), transparent 55%),
                   #0A0812;
       overflow: hidden;
+      animation: sm-loading-fadein 0.4s ease both;
+  }}
+  .sm-loading-overlay.sm-loading-out {{
+      animation: sm-loading-fadeout 0.45s cubic-bezier(.4,0,1,1) both;
   }}
   .sm-loading-overlay::before {{
       content: ""; position: absolute; inset: 0; pointer-events: none;
@@ -427,27 +445,40 @@ _LOGIN_LOADING_HTML = f"""
       animation: sm-loading-twinkle 3.2s ease-in-out infinite alternate;
   }}
   .sm-loading-planet {{
-      position: absolute; top: 10%; right: 10%;
-      width: 200px; height: 200px; border-radius: 50%;
+      position: absolute; top: 8%; right: 8%;
+      width: 220px; height: 220px; border-radius: 50%;
       background: radial-gradient(circle at 35% 30%, #FFA679 0%, #C1502C 48%, #6E2410 78%, #3c1207 100%);
-      box-shadow: 0 0 70px 12px rgba(255, 111, 74, 0.32), inset -18px -18px 40px rgba(0,0,0,0.4);
+      box-shadow: 0 0 80px 14px rgba(255, 111, 74, 0.34), inset -18px -18px 40px rgba(0,0,0,0.4);
       animation: sm-loading-drift 5s ease-in-out infinite;
   }}
   .sm-loading-chart {{
-      width: min(72vw, 560px); height: 200px; margin-bottom: 30px;
-      filter: drop-shadow(0 0 12px rgba(167, 139, 250, 0.55));
+      width: min(88vw, 760px); height: 320px; margin-bottom: 22px;
+      filter: drop-shadow(0 0 14px rgba(167, 139, 250, 0.55));
   }}
   .sm-loading-path {{
       stroke-dasharray: 1000; stroke-dashoffset: 1000;
-      animation: sm-loading-draw 2.4s ease-in-out infinite;
+      animation: sm-loading-draw 1.5s cubic-bezier(.16,.8,.28,1) infinite;
   }}
-  .sm-loading-text {{
+  .sm-loading-rocket {{ filter: drop-shadow(0 0 8px rgba(255,166,121,0.85)); }}
+  .sm-loading-text {{ text-align: center; }}
+  .sm-loading-title {{
       font-family: 'Space Grotesk', sans-serif; color: #EDEBF5;
-      font-size: 1.35rem; letter-spacing: 0.02em;
+      font-size: 2rem; font-weight: 700; letter-spacing: 0.02em;
+      text-shadow: 0 0 22px rgba(167, 139, 250, 0.65);
+      animation: sm-loading-pulse 1.1s ease-in-out infinite;
+  }}
+  .sm-loading-sub {{
+      font-family: 'Space Grotesk', sans-serif; color: #C9C4DB;
+      font-size: 1.05rem; letter-spacing: 0.02em; margin-top: 6px;
   }}
   .sm-loading-dot {{ display: inline-block; opacity: 0; animation: sm-loading-dotblink 1.4s infinite; }}
   .sm-loading-dot:nth-child(2) {{ animation-delay: 0.25s; }}
   .sm-loading-dot:nth-child(3) {{ animation-delay: 0.5s; }}
+  @keyframes sm-loading-fadein {{ from {{ opacity: 0; }} to {{ opacity: 1; }} }}
+  @keyframes sm-loading-fadeout {{
+      from {{ opacity: 1; transform: scale(1); }}
+      to   {{ opacity: 0; transform: scale(1.06); }}
+  }}
   @keyframes sm-loading-twinkle {{ from {{ opacity: 0.5; }} to {{ opacity: 1; }} }}
   @keyframes sm-loading-drift {{
       0%, 100% {{ transform: translate(0, 0) scale(1); }}
@@ -455,8 +486,12 @@ _LOGIN_LOADING_HTML = f"""
   }}
   @keyframes sm-loading-draw {{
       0%   {{ stroke-dashoffset: 1000; }}
-      65%  {{ stroke-dashoffset: 0; }}
+      70%  {{ stroke-dashoffset: 0; }}
       100% {{ stroke-dashoffset: 0; }}
+  }}
+  @keyframes sm-loading-pulse {{
+      0%, 100% {{ transform: scale(1); }}
+      50%      {{ transform: scale(1.045); }}
   }}
   @keyframes sm-loading-dotblink {{
       0%, 80%, 100% {{ opacity: 0; }}
@@ -467,12 +502,16 @@ _LOGIN_LOADING_HTML = f"""
 
 
 def _play_login_loading():
-    """로그인/회원가입 성공 직후 잠깐 보여주는 우주·화성 컨셉 로딩 연출.
-    stroke-dasharray/animateMotion(SMIL)만으로 그려서 별도 JS 컴포넌트 없이 st.markdown으로 충분."""
+    """로그인/회원가입 성공 직후 잠깐 보여주는 우주·화성 컨셉 로딩 연출(로켓 + 우상향 차트).
+    SMIL(stroke-dasharray/animateMotion)만으로 그려서 별도 JS 컴포넌트 없이 st.markdown으로 충분.
+    끝난 뒤 오버레이는 페이드아웃, 메인 페이지는 페이드인 되도록 플래그를 남긴다(화면 전환감)."""
     _ph = st.empty()
-    _ph.markdown(_LOGIN_LOADING_HTML, unsafe_allow_html=True)
-    time.sleep(2.1)
+    _ph.markdown(_LOGIN_LOADING_HTML_TMPL.replace("%%CLS%%", ""), unsafe_allow_html=True)
+    time.sleep(1.7)
+    _ph.markdown(_LOGIN_LOADING_HTML_TMPL.replace("%%CLS%%", "sm-loading-out"), unsafe_allow_html=True)
+    time.sleep(0.45)
     _ph.empty()
+    st.session_state["_just_logged_in"] = True
 
 # Neon(무료 Postgres) 등 st.secrets["DATABASE_URL"]이 설정돼 있으면 자동으로 영구 저장
 # 백엔드로 전환된다(storage.py는 streamlit 비의존이라 여기서 값을 주입해준다).
@@ -548,6 +587,21 @@ if "db_path" not in st.session_state:
     st.stop()
 
 ST.init_db(current_db())
+
+# 로그인 로딩 연출 직후 한 번만: 로딩 화면이 사라진 자리에 메인 페이지가 페이드인
+# 되도록(화면 전환감). 플래그를 바로 pop하므로 이후 평범한 rerun에는 재생되지 않는다.
+if st.session_state.pop("_just_logged_in", False):
+    st.markdown("""
+    <style>
+    div[data-testid="stAppViewContainer"] {
+        animation: sm-page-fadein 0.6s ease both;
+    }
+    @keyframes sm-page-fadein {
+        from { opacity: 0; transform: translateY(6px) scale(0.995); }
+        to   { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    </style>
+    """, unsafe_allow_html=True)
 
 
 # ---------------------------------------------------------------- 캐시 래퍼
