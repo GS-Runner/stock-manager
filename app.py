@@ -253,6 +253,16 @@ div[data-testid="stTextInputRootElement"]:has(input[aria-label="Ticker"]):focus-
 @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+/* ── 모바일(폰) 화면: 사이드바 위젯 텍스트/여백 살짝 축소 — 레이아웃 자체는
+   Streamlit이 기본으로 반응형(좁은 화면에서 사이드바가 접히는 서랍 형태)이라
+   별도 트리거 불필요, 가독성만 다듬는다 ── */
+@media (max-width: 640px) {
+    .sm-indices { padding: 8px 10px; }
+    .sm-indices .name { font-size: 0.68rem; }
+    .sm-indices .val { font-size: 0.8rem; }
+    h1 { font-size: 1.7rem !important; }
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -381,39 +391,43 @@ _BGM_HTML = """
 """
 
 # ─── 로그인/회원가입 성공 시 전체화면 로딩 연출 (순수 HTML/CSS/SVG — JS 불필요) ───
-# 화성 느낌의 붉은 행성 + 별빛 우주 배경 위로, 로켓이 위아래로 지그재그 튀며 우상향하는
-# 차트 라인을 따라 "슈우웅" 날아간다. SVG <animateMotion>(SMIL, 스크립트 없이 브라우저가
-# 직접 실행 — rotate="auto"로 진행 방향에 맞춰 로켓이 기울어진다)으로 구현.
-_CHART_PATH_D = ("M0,210 L60,120 L120,165 L180,60 L240,110 L300,-10 "
-                  "L360,55 L420,-90 L470,-40 L500,-130")
+# 화성 느낌의 붉은 행성 + 별빛 우주 배경 위로, 로켓이 화면의 80% 가까이를 쓰는 대형
+# 지그재그 차트를 따라 왼쪽 아래 → 오른쪽 위(화성)까지 "슈우웅" 한 번에 날아간다.
+# SVG <animateMotion>(SMIL, 스크립트 없이 브라우저가 직접 실행 — rotate="auto"로 진행
+# 방향에 맞춰 기울어지고, fill="freeze"로 도착 지점(화성)에 도달한 채로 멈춘다)으로 구현.
+# 전체 3.0초(페이드인 0.3s + 비행 2.3s + 화성 도착 후 잠깐 정지 + 페이드아웃 0.4s)로 고정.
+_CHART_PATH_D = ("M40,760 L200,540 L300,660 L440,380 L560,520 "
+                  "L680,240 L800,380 L920,120 L1000,220 L1080,60")
 _LOGIN_LOADING_HTML_TMPL = f"""
 <div class="sm-loading-overlay %%CLS%%">
-  <div class="sm-loading-planet"></div>
-  <svg class="sm-loading-chart" viewBox="-20 -150 560 380" preserveAspectRatio="xMidYMid meet">
-    <defs>
-      <linearGradient id="sm-chart-grad" x1="0" y1="0" x2="1" y2="0">
-        <stop offset="0%" stop-color="#FF8A65"/>
-        <stop offset="50%" stop-color="#A78BFA"/>
-        <stop offset="100%" stop-color="#00E68A"/>
-      </linearGradient>
-      <marker id="sm-arrowhead" markerWidth="10" markerHeight="10" refX="3" refY="5" orient="auto">
-        <path d="M0,0 L7,5 L0,10 Z" fill="#00E68A"/>
-      </marker>
-    </defs>
-    <path d="{_CHART_PATH_D}" fill="none" stroke="url(#sm-chart-grad)"
-          stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round"
-          pathLength="1000" class="sm-loading-path" marker-end="url(#sm-arrowhead)"/>
-    <circle r="5" fill="#A78BFA" opacity="0.55" class="sm-loading-trail">
-      <animateMotion dur="1.5s" repeatCount="indefinite" begin="-0.28s" path="{_CHART_PATH_D}"/>
-    </circle>
-    <circle r="4" fill="#EDEBF5" opacity="0.35" class="sm-loading-trail">
-      <animateMotion dur="1.5s" repeatCount="indefinite" begin="-0.16s" path="{_CHART_PATH_D}"/>
-    </circle>
-    <text font-size="34" text-anchor="middle" dominant-baseline="middle" class="sm-loading-rocket">
-      🚀
-      <animateMotion dur="1.5s" repeatCount="indefinite" rotate="auto" path="{_CHART_PATH_D}"/>
-    </text>
-  </svg>
+  <div class="sm-loading-stage">
+    <div class="sm-loading-planet"></div>
+    <svg class="sm-loading-chart" viewBox="0 0 1200 800" preserveAspectRatio="none">
+      <defs>
+        <linearGradient id="sm-chart-grad" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stop-color="#FF8A65"/>
+          <stop offset="50%" stop-color="#A78BFA"/>
+          <stop offset="100%" stop-color="#00E68A"/>
+        </linearGradient>
+        <marker id="sm-arrowhead" markerWidth="8" markerHeight="8" refX="2.4" refY="4" orient="auto">
+          <path d="M0,0 L5.6,4 L0,8 Z" fill="#00E68A" class="sm-loading-arrowtip"/>
+        </marker>
+      </defs>
+      <path d="{_CHART_PATH_D}" fill="none" stroke="url(#sm-chart-grad)"
+            stroke-width="12" stroke-linecap="round" stroke-linejoin="round"
+            pathLength="1000" class="sm-loading-path" marker-end="url(#sm-arrowhead)"/>
+      <circle r="10" fill="#A78BFA" opacity="0.5" class="sm-loading-trail">
+        <animateMotion dur="2.3s" begin="-0.18s" fill="freeze" path="{_CHART_PATH_D}"/>
+      </circle>
+      <circle r="8" fill="#EDEBF5" opacity="0.35" class="sm-loading-trail">
+        <animateMotion dur="2.3s" begin="-0.09s" fill="freeze" path="{_CHART_PATH_D}"/>
+      </circle>
+      <text font-size="58" text-anchor="middle" dominant-baseline="middle" class="sm-loading-rocket">
+        🚀
+        <animateMotion dur="2.3s" fill="freeze" rotate="auto" path="{_CHART_PATH_D}"/>
+      </text>
+    </svg>
+  </div>
   <div class="sm-loading-text">
     <div class="sm-loading-title">LET'S GET RICH 🚀</div>
     <div class="sm-loading-sub">Launching your portfolio<span class="sm-loading-dot">.</span><span class="sm-loading-dot">.</span><span class="sm-loading-dot">.</span></div>
@@ -427,10 +441,10 @@ _LOGIN_LOADING_HTML_TMPL = f"""
                   radial-gradient(ellipse at 82% 88%, rgba(255,111,74,0.14), transparent 55%),
                   #0A0812;
       overflow: hidden;
-      animation: sm-loading-fadein 0.4s ease both;
+      animation: sm-loading-fadein 0.3s ease both;
   }}
   .sm-loading-overlay.sm-loading-out {{
-      animation: sm-loading-fadeout 0.45s cubic-bezier(.4,0,1,1) both;
+      animation: sm-loading-fadeout 0.4s cubic-bezier(.4,0,1,1) both;
   }}
   .sm-loading-overlay::before {{
       content: ""; position: absolute; inset: 0; pointer-events: none;
@@ -444,22 +458,29 @@ _LOGIN_LOADING_HTML_TMPL = f"""
       background-repeat: repeat; background-size: 300px 300px;
       animation: sm-loading-twinkle 3.2s ease-in-out infinite alternate;
   }}
+  .sm-loading-stage {{
+      position: relative; width: 88vw; height: 64vh; margin-bottom: 16px;
+  }}
   .sm-loading-planet {{
-      position: absolute; top: 8%; right: 8%;
-      width: 220px; height: 220px; border-radius: 50%;
+      position: absolute; top: 3%; right: 5%;
+      width: min(210px, 19vw); height: min(210px, 19vw); border-radius: 50%;
       background: radial-gradient(circle at 35% 30%, #FFA679 0%, #C1502C 48%, #6E2410 78%, #3c1207 100%);
       box-shadow: 0 0 80px 14px rgba(255, 111, 74, 0.34), inset -18px -18px 40px rgba(0,0,0,0.4);
       animation: sm-loading-drift 5s ease-in-out infinite;
   }}
   .sm-loading-chart {{
-      width: min(88vw, 760px); height: 320px; margin-bottom: 22px;
-      filter: drop-shadow(0 0 14px rgba(167, 139, 250, 0.55));
+      position: absolute; inset: 0; width: 100%; height: 100%;
+      filter: drop-shadow(0 0 16px rgba(167, 139, 250, 0.55));
   }}
   .sm-loading-path {{
       stroke-dasharray: 1000; stroke-dashoffset: 1000;
-      animation: sm-loading-draw 1.5s cubic-bezier(.16,.8,.28,1) infinite;
+      animation: sm-loading-draw 2.3s cubic-bezier(.16,.8,.28,1) 1 forwards;
   }}
-  .sm-loading-rocket {{ filter: drop-shadow(0 0 8px rgba(255,166,121,0.85)); }}
+  .sm-loading-rocket {{ filter: drop-shadow(0 0 10px rgba(255,166,121,0.9)); }}
+  .sm-loading-arrowtip {{
+      opacity: 0; animation: sm-loading-arrow-reveal 0.25s ease 2.05s forwards;
+  }}
+  @keyframes sm-loading-arrow-reveal {{ to {{ opacity: 1; }} }}
   .sm-loading-text {{ text-align: center; }}
   .sm-loading-title {{
       font-family: 'Space Grotesk', sans-serif; color: #EDEBF5;
@@ -486,7 +507,6 @@ _LOGIN_LOADING_HTML_TMPL = f"""
   }}
   @keyframes sm-loading-draw {{
       0%   {{ stroke-dashoffset: 1000; }}
-      70%  {{ stroke-dashoffset: 0; }}
       100% {{ stroke-dashoffset: 0; }}
   }}
   @keyframes sm-loading-pulse {{
@@ -497,19 +517,26 @@ _LOGIN_LOADING_HTML_TMPL = f"""
       0%, 80%, 100% {{ opacity: 0; }}
       40%           {{ opacity: 1; }}
   }}
+  @media (max-width: 640px) {{
+      .sm-loading-stage {{ width: 94vw; height: 52vh; }}
+      .sm-loading-title {{ font-size: 1.4rem; }}
+      .sm-loading-sub {{ font-size: 0.85rem; }}
+  }}
 </style>
 """
 
 
 def _play_login_loading():
-    """로그인/회원가입 성공 직후 잠깐 보여주는 우주·화성 컨셉 로딩 연출(로켓 + 우상향 차트).
-    SMIL(stroke-dasharray/animateMotion)만으로 그려서 별도 JS 컴포넌트 없이 st.markdown으로 충분.
-    끝난 뒤 오버레이는 페이드아웃, 메인 페이지는 페이드인 되도록 플래그를 남긴다(화면 전환감)."""
+    """로그인/회원가입 성공 직후 보여주는 우주·화성 컨셉 로딩 연출(로켓이 대형 우상향
+    차트를 따라 화성까지 한 번에 비행). 총 3.0초 고정(페이드인 0.3s + 비행·정지 2.6s +
+    페이드아웃 0.4s에서 겹치는 부분 보정). SMIL(stroke-dasharray/animateMotion)만으로
+    그려서 별도 JS 컴포넌트 없이 st.markdown으로 충분. 끝난 뒤 오버레이는 페이드아웃,
+    메인 페이지는 페이드인 되도록 플래그를 남긴다(화면 전환감)."""
     _ph = st.empty()
     _ph.markdown(_LOGIN_LOADING_HTML_TMPL.replace("%%CLS%%", ""), unsafe_allow_html=True)
-    time.sleep(1.7)
+    time.sleep(2.6)
     _ph.markdown(_LOGIN_LOADING_HTML_TMPL.replace("%%CLS%%", "sm-loading-out"), unsafe_allow_html=True)
-    time.sleep(0.45)
+    time.sleep(0.4)
     _ph.empty()
     st.session_state["_just_logged_in"] = True
 
