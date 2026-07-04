@@ -98,6 +98,19 @@ def get_history(symbol: str, period: str = "1y", interval: str = "1d"):
         return pd.DataFrame()
 
 
+MARKET_INDICES = [("NASDAQ", "^IXIC"), ("S&P 500", "^GSPC")]
+
+
+def get_market_indices() -> list[dict]:
+    """주요 지수(나스닥/S&P500) 시세 — 사이드바 상시 표시용."""
+    out = []
+    for name, sym in MARKET_INDICES:
+        q = get_quote(sym)
+        out.append({"name": name, "price": q.get("price"),
+                    "change_pct": q.get("change_pct")})
+    return out
+
+
 def get_analyst_recommendations(symbol: str) -> list[dict]:
     """최근 수개월 애널리스트 추천 분포(월별 strongBuy/buy/hold/sell/strongSell 카운트).
     narrative.analyst_momentum()의 입력으로 쓰인다."""

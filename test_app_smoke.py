@@ -98,22 +98,22 @@ assert not at.exception, f"상세 페이지 예외: {at.exception}"
 assert len(at.tabs) >= 7, f"탭이 렌더되지 않음 (탭 수={len(at.tabs)}) — 상세 페이지 미실행"
 labels = [m.label for m in at.metric]
 assert "Forward P/E" in labels, f"개요 탭 metric 미렌더: {labels[:10]}"
-assert "주당 내재가치" in labels, "DCF 탭 미렌더"
-assert "확률가중 기대 목표주가" in labels, f"시나리오 탭 미렌더: {labels[:20]}"
-assert "뉴스 버즈" in labels and "헤드라인 톤" in labels and "애널리스트 모멘텀" in labels, \
+assert "Intrinsic Value / Share" in labels, "DCF 탭 미렌더"
+assert "Blended Target Price" in labels, f"시나리오 탭 미렌더: {labels[:20]}"
+assert "News Buzz" in labels and "Headline Tone" in labels and "Analyst Momentum" in labels, \
     f"뉴스·Narrative 탭 미렌더: {labels[:20]}"
 print(f"   [ok] 상세 페이지 예외 없음. 탭 {len(at.tabs)}개, metric {len(at.metric)}개 렌더")
-print(f"   주요 metric 일부: {[l for l in labels if l in ('Forward P/E','P/B','P/S','EV/EBITDA','주당 내재가치','내재 FCF 성장률')]}")
+print(f"   주요 metric 일부: {[l for l in labels if l in ('Forward P/E','P/B','P/S','EV/EBITDA','Intrinsic Value / Share','Implied FCF Growth')]}")
 
 print("3) 차트: 일봉(캔들)+실시간 ON(다이나믹 TradingView 기본값), 월봉 경로 실행...")
 assert at.segmented_control, "차트 컨트롤(segmented_control) 미렌더"
 sym = at.segmented_control[0].key.replace("gran_", "")
 assert at.toggle(key=f"dyn_{sym}").value is True, "다이나믹(TradingView) 차트 기본값이 ON이 아님"
-at.segmented_control(key=f"gran_{sym}").set_value("일봉")
+at.segmented_control(key=f"gran_{sym}").set_value("Daily")
 at.toggle(key=f"live_{sym}").set_value(True)
 at.run(timeout=120)
 assert not at.exception, f"일봉/실시간(다이나믹) 예외: {at.exception}"
-at.segmented_control(key=f"gran_{sym}").set_value("월봉")
+at.segmented_control(key=f"gran_{sym}").set_value("Monthly")
 at.toggle(key=f"live_{sym}").set_value(False)
 at.run(timeout=120)
 assert not at.exception, f"월봉(다이나믹) 예외: {at.exception}"

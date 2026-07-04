@@ -76,7 +76,7 @@ def test_build_figure_volume_panel():
     df = _synthetic()
     df["Volume"] = np.random.RandomState(1).randint(1e6, 5e6, len(df))
     f = CH.build_figure(df, "candle", interval="1d", show_volume=True)
-    assert any(t.type == "bar" and t.name == "거래량" for t in f.data), "거래량 막대 없음"
+    assert any(t.type == "bar" and t.name == "Volume" for t in f.data), "거래량 막대 없음"
     # 가격/거래량 패널로 y축 분할되었는지
     assert f.layout.yaxis.domain[0] > 0.2, "가격 패널 domain 미조정"
     assert f.layout.yaxis2.domain[1] <= 0.2, "거래량 패널 domain 미조정"

@@ -10,11 +10,14 @@ import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 
-GREEN = "#00C805"   # Robinhood green
-RED = "#FF5000"     # Robinhood red
-DIM_GREEN = "rgba(0,200,5,0.10)"
-DIM_RED = "rgba(255,80,0,0.10)"
-GRID = "rgba(255,255,255,0.06)"
+# Purple×Dark 팔레트 — 다크 서피스(#0D0A14) 기준 대비·CVD 검증 완료(작업노트 4-6 참조)
+GREEN = "#00E68A"   # 상승
+RED = "#FF5252"     # 하락
+DIM_GREEN = "rgba(0,230,138,0.09)"
+DIM_RED = "rgba(255,82,82,0.09)"
+GRID = "rgba(167,139,250,0.08)"
+SMA_SHORT = "#38BDF8"   # 단기 이동평균(sky)
+SMA_LONG = "#FBBF24"    # 장기 이동평균(amber)
 
 
 # 간격(interval)별 SMA 윈도우 기본값 (단기, 장기)
@@ -144,21 +147,21 @@ def build_figure(df: pd.DataFrame, mode: str = "line", *,
     if mode == "candle":
         fig.add_trace(go.Candlestick(
             x=df.index, open=df["Open"], high=df["High"], low=df["Low"],
-            close=df["Close"], name="가격",
+            close=df["Close"], name="Price",
             increasing_line_color=GREEN, decreasing_line_color=RED,
             increasing_fillcolor=GREEN, decreasing_fillcolor=RED))
         # SMA 오버레이
         fig.add_trace(go.Scatter(x=df.index, y=df["Close"].rolling(short).mean(),
                                  mode="lines", name=f"SMA{short}",
-                                 line=dict(color="#7AA2FF", width=1)))
+                                 line=dict(color=SMA_SHORT, width=1)))
         fig.add_trace(go.Scatter(x=df.index, y=df["Close"].rolling(long).mean(),
                                  mode="lines", name=f"SMA{long}",
-                                 line=dict(color="#FFB020", width=1)))
+                                 line=dict(color=SMA_LONG, width=1)))
     else:  # line / area (Robinhood)
         col = _period_color(df)
-        fill_col = "rgba(0,200,5,0.08)" if col == GREEN else "rgba(255,80,0,0.08)"
+        fill_col = "rgba(0,230,138,0.08)" if col == GREEN else "rgba(255,82,82,0.08)"
         fig.add_trace(go.Scatter(
-            x=df.index, y=df["Close"], mode="lines", name="가격",
+            x=df.index, y=df["Close"], mode="lines", name="Price",
             line=dict(color=col, width=2), fill="tozeroy", fillcolor=fill_col,
             hovertemplate="%{x|%Y-%m-%d %H:%M}<br>$%{y:.2f}<extra></extra>"))
         lo = float(df["Close"].min()) * 0.985
@@ -213,7 +216,7 @@ def build_figure(df: pd.DataFrame, mode: str = "line", *,
             bar_colors = [GREEN] + [GREEN if close.iloc[i] >= close.iloc[i - 1]
                                     else RED for i in range(1, len(close))]
         fig.add_trace(go.Bar(
-            x=df.index, y=df["Volume"], name="거래량", yaxis="y2",
+            x=df.index, y=df["Volume"], name="Volume", yaxis="y2",
             marker_color=bar_colors, marker_line_width=0, opacity=0.5,
             hovertemplate="거래량 %{y:,.0f}<extra></extra>"))
         vol_added = True
@@ -233,7 +236,7 @@ def build_figure(df: pd.DataFrame, mode: str = "line", *,
         fig.update_layout(
             yaxis=dict(domain=[0.26, 1.0]),
             yaxis2=dict(domain=[0.0, 0.18], showgrid=False, zeroline=False,
-                        title_text="거래량"),
+                        title_text="Volume"),
         )
     return fig
 
@@ -243,11 +246,13 @@ def build_figure(df: pd.DataFrame, mode: str = "line", *,
 # 기존 plotly build_figure()의 추세탐지·촉매매칭 로직을 그대로 재사용해 두 렌더러가
 # 같은 데이터로 일치된 결과를 보여주게 한다.
 TV_DARK_THEME = {
-    "layout": {"background": {"color": "#0B0D10"}, "textColor": "#D1D4DC"},
-    "grid": {"vertLines": {"color": "rgba(255,255,255,0.06)"},
-             "horzLines": {"color": "rgba(255,255,255,0.06)"}},
-    "timeScale": {"borderColor": "rgba(255,255,255,0.12)"},
-    "rightPriceScale": {"borderColor": "rgba(255,255,255,0.12)"},
+    "layout": {"background": {"color": "#0D0A14"}, "textColor": "#C9C4DB"},
+    "grid": {"vertLines": {"color": "rgba(167,139,250,0.07)"},
+             "horzLines": {"color": "rgba(167,139,250,0.07)"}},
+    "timeScale": {"borderColor": "rgba(167,139,250,0.18)"},
+    "rightPriceScale": {"borderColor": "rgba(167,139,250,0.18)"},
+    "crosshair": {"vertLine": {"color": "rgba(167,139,250,0.45)"},
+                  "horzLine": {"color": "rgba(167,139,250,0.45)"}},
 }
 
 _INTRADAY_INTERVALS = ("1m", "2m", "5m", "15m", "30m", "60m", "90m", "1h")
@@ -323,7 +328,7 @@ def _tv_volume_pane(df: pd.DataFrame, mode: str, intraday: bool, height: int = 1
         "type": "Histogram", "data": data,
         "options": {"priceFormat": {"type": "volume"}, "priceLineVisible": False},
         "priceScale": {"scaleMargins": {"top": 0.2, "bottom": 0}},
-    }], "height": height, "title": "거래량"}
+    }], "height": height, "title": "Volume"}
 
 
 def build_tv_panes(df: pd.DataFrame, mode: str = "line", *, interval: str = "1d",
@@ -341,8 +346,8 @@ def build_tv_panes(df: pd.DataFrame, mode: str = "line", *, interval: str = "1d"
 
     series = [_tv_price_series(df, mode, intraday)]
     if mode == "candle":
-        series.append(_tv_sma_series(df, short, "#7AA2FF", intraday))
-        series.append(_tv_sma_series(df, long, "#FFB020", intraday))
+        series.append(_tv_sma_series(df, short, SMA_SHORT, intraday))
+        series.append(_tv_sma_series(df, long, SMA_LONG, intraday))
     if show_trend:
         markers = _tv_markers(changes, matched, intraday)
         if markers:

@@ -31,37 +31,332 @@ except ImportError:  # 미설치 환경에선 plotly 차트로만 동작(폴백)
 
 st.set_page_config(page_title="StockManager", page_icon="📈", layout="wide")
 
-# 마이크로 애니메이션(metric 카드 페이드인·hover, progress bar 부드러운 채움) —
-# Robinhood 다크 테마(.streamlit/config.toml)에 얹는 순수 CSS. JS/컴포넌트 불필요.
+# ─── Purple × Dark 디자인 시스템 (순수 CSS — JS/컴포넌트 불필요) ───────────────
+# 팔레트(다크 서피스 #0D0A14 기준 대비·CVD 검증 완료):
+#   accent  #A78BFA / deep #7C3AED   up #00E68A   down #FF5252
+# 애니메이션: 카드 페이드인, hover 리프트+글로우, 그라디언트 타이틀, LIVE 펄스.
 st.markdown("""
 <style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&display=swap');
+
+:root {
+    --sm-accent: #A78BFA;
+    --sm-accent-deep: #7C3AED;
+    --sm-up: #00E68A;
+    --sm-down: #FF5252;
+    --sm-card: rgba(167, 139, 250, 0.05);
+    --sm-border: rgba(167, 139, 250, 0.16);
+}
+
+/* ── 타이틀: 퍼플 그라디언트 + 은은한 흐름 ── */
+h1 {
+    font-family: 'Space Grotesk', sans-serif !important;
+    background: linear-gradient(120deg, #EDEBF5 20%, var(--sm-accent) 45%,
+                                #6EE7F9 70%, #EDEBF5 95%);
+    background-size: 260% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: sm-gradient-flow 9s ease-in-out infinite;
+}
+h2, h3 { font-family: 'Space Grotesk', sans-serif !important; }
+
+/* ── metric 카드: 글래스 카드 + 진입 애니메이션 + hover 리프트 ── */
 div[data-testid="stMetric"] {
-    animation: sm-fade-in 0.35s ease-out;
-    transition: transform 0.15s ease, box-shadow 0.15s ease;
-    border-radius: 10px;
-    padding: 6px 8px;
+    background: var(--sm-card);
+    border: 1px solid var(--sm-border);
+    border-radius: 14px;
+    padding: 12px 14px;
+    animation: sm-rise-in 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+    transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
 }
 div[data-testid="stMetric"]:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 14px rgba(0, 200, 5, 0.12);
+    transform: translateY(-3px);
+    border-color: rgba(167, 139, 250, 0.45);
+    box-shadow: 0 8px 26px rgba(124, 58, 237, 0.22);
 }
+/* 카드 순차 등장(스태거) */
+div[data-testid="column"]:nth-of-type(2) div[data-testid="stMetric"] { animation-delay: 0.05s; }
+div[data-testid="column"]:nth-of-type(3) div[data-testid="stMetric"] { animation-delay: 0.10s; }
+div[data-testid="column"]:nth-of-type(4) div[data-testid="stMetric"] { animation-delay: 0.15s; }
+
+/* ── 표·익스팬더·탭 패널 진입 ── */
 div[data-testid="stDataFrame"], div[data-testid="stExpander"] {
-    animation: sm-fade-in 0.4s ease-out;
+    animation: sm-rise-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+div[data-testid="stExpander"] {
+    border: 1px solid var(--sm-border);
+    border-radius: 12px;
+}
+
+/* ── 탭: 퍼플 언더라인 글로우 + 살짝 튀는 클릭감 ── */
+button[data-baseweb="tab"] {
+    transition: color 0.15s ease, transform 0.25s cubic-bezier(.34,1.56,.64,1);
+}
+button[data-baseweb="tab"]:active { transform: scale(0.95); }
+button[data-baseweb="tab"][aria-selected="true"] {
+    text-shadow: 0 0 18px rgba(167, 139, 250, 0.65);
+}
+div[data-baseweb="tab-highlight"] {
+    background: linear-gradient(90deg, var(--sm-accent-deep), var(--sm-accent)) !important;
+    height: 3px !important;
+    border-radius: 3px;
+    box-shadow: 0 0 12px rgba(167, 139, 250, 0.55);
+    transition: left 0.3s cubic-bezier(.34,1.56,.64,1), width 0.3s cubic-bezier(.34,1.56,.64,1);
+}
+
+/* ── 버튼: 퍼플 그라디언트(primary) + 통통 튀는 hover/클릭 ── */
+button[kind="primary"], button[data-testid="stBaseButton-primary"] {
+    background: linear-gradient(135deg, var(--sm-accent-deep), #9F5BFF) !important;
+    border: none !important;
+    transition: transform 0.28s cubic-bezier(.34,1.56,.64,1), box-shadow 0.2s ease, filter 0.18s ease;
+}
+button[kind="primary"]:hover, button[data-testid="stBaseButton-primary"]:hover {
+    transform: translateY(-2px) scale(1.035);
+    filter: brightness(1.12);
+    box-shadow: 0 4px 20px rgba(124, 58, 237, 0.45);
+}
+button[kind="secondary"], button[data-testid="stBaseButton-secondary"] {
+    border-color: var(--sm-border) !important;
+    transition: transform 0.28s cubic-bezier(.34,1.56,.64,1), box-shadow 0.2s ease, border-color 0.18s ease;
+}
+button[kind="secondary"]:hover, button[data-testid="stBaseButton-secondary"]:hover {
+    transform: translateY(-2px) scale(1.03);
+    border-color: rgba(167, 139, 250, 0.55) !important;
+    box-shadow: 0 3px 14px rgba(124, 58, 237, 0.28);
+}
+button[kind="primary"]:active, button[data-testid="stBaseButton-primary"]:active,
+button[kind="secondary"]:active, button[data-testid="stBaseButton-secondary"]:active {
+    transform: scale(0.94) !important;
+    transition: transform 0.08s ease !important;
+}
+
+/* ── 사이드바: 미묘한 퍼플 그라디언트 배경 ── */
+section[data-testid="stSidebar"] > div {
+    background: linear-gradient(180deg, #131022 0%, #0D0A14 45%);
+}
+
+/* ── 우주 배경: 은은한 성운 + 반짝이는 별 + 떠다니는 행성 ── */
+.stApp {
+    background: radial-gradient(ellipse at 15% -8%, rgba(124,58,237,0.18), transparent 55%),
+                radial-gradient(ellipse at 105% 8%, rgba(56,189,248,0.10), transparent 50%),
+                radial-gradient(ellipse at 45% 105%, rgba(167,139,250,0.09), transparent 60%),
+                #0D0A14;
+}
+.stApp::before {
+    content: ""; position: fixed; inset: 0; z-index: -2; pointer-events: none;
+    background-image:
+        radial-gradient(1.6px 1.6px at 20% 30%, rgba(255,255,255,0.85), transparent),
+        radial-gradient(1px 1px at 60% 72%, rgba(255,255,255,0.6), transparent),
+        radial-gradient(1.6px 1.6px at 82% 18%, rgba(167,139,250,0.9), transparent),
+        radial-gradient(1px 1px at 33% 88%, rgba(255,255,255,0.5), transparent),
+        radial-gradient(1.6px 1.6px at 92% 62%, rgba(110,231,249,0.85), transparent),
+        radial-gradient(1px 1px at 8% 62%, rgba(255,255,255,0.5), transparent),
+        radial-gradient(1.6px 1.6px at 50% 42%, rgba(255,255,255,0.7), transparent),
+        radial-gradient(1px 1px at 70% 95%, rgba(255,255,255,0.45), transparent);
+    background-repeat: repeat; background-size: 360px 360px;
+    animation: sm-twinkle 4.5s ease-in-out infinite alternate;
+}
+.stApp::after {
+    content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+    background:
+        radial-gradient(circle at 88% 22%, rgba(167,139,250,0.45),
+                        rgba(124,58,237,0.16) 42%, transparent 62%),
+        radial-gradient(circle at 38% 96%, rgba(56,189,248,0.30),
+                        rgba(56,189,248,0.08) 45%, transparent 65%);
+    background-size: 60vw 60vw, 34vw 34vw;
+    background-repeat: no-repeat;
+    background-position: 88% 22%, 38% 96%;
+    filter: blur(2px);
+    animation: sm-planet-drift 26s ease-in-out infinite;
+}
+@keyframes sm-twinkle {
+    from { opacity: 0.5; }
+    to   { opacity: 1; }
+}
+@keyframes sm-planet-drift {
+    0%, 100%   { transform: translate(0, 0) scale(1); }
+    50%        { transform: translate(-2.5%, 3%) scale(1.04); }
+}
+
+/* ── progress bar: 그라디언트 + 부드러운 채움 ── */
+div[role="progressbar"] > div > div {
+    background: linear-gradient(90deg, var(--sm-accent-deep), var(--sm-accent)) !important;
 }
 div[role="progressbar"] > div { transition: width 0.6s ease; }
-button[kind="primary"], button[kind="secondary"] {
-    transition: transform 0.1s ease, box-shadow 0.15s ease;
+
+/* ── 스크롤바 ── */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb {
+    background: rgba(167, 139, 250, 0.25);
+    border-radius: 8px;
 }
-button[kind="primary"]:hover, button[kind="secondary"]:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 2px 10px rgba(0, 200, 5, 0.18);
+::-webkit-scrollbar-thumb:hover { background: rgba(167, 139, 250, 0.45); }
+
+/* ── 사이드바 지수 스트립 ── */
+.sm-indices {
+    display: flex; flex-direction: column; gap: 6px;
+    padding: 10px 12px;
+    border: 1px solid var(--sm-border);
+    border-radius: 12px;
+    background: var(--sm-card);
+    animation: sm-rise-in 0.5s ease both;
 }
-@keyframes sm-fade-in {
-    from { opacity: 0; transform: translateY(4px); }
-    to   { opacity: 1; transform: translateY(0); }
+.sm-indices .row { display: flex; justify-content: space-between; align-items: baseline; }
+.sm-indices .name { font-size: 0.72rem; letter-spacing: 0.06em; opacity: 0.75; }
+.sm-indices .val { font-size: 0.85rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.sm-indices .up   { color: var(--sm-up); }
+.sm-indices .down { color: var(--sm-down); }
+.sm-live-dot {
+    display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+    background: var(--sm-up); margin-right: 6px;
+    animation: sm-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes sm-rise-in {
+    0%   { opacity: 0; transform: translateY(10px) scale(0.96); }
+    65%  { opacity: 1; transform: translateY(-2px) scale(1.012); }
+    100% { transform: translateY(0) scale(1); }
+}
+@keyframes sm-gradient-flow {
+    0%, 100% { background-position: 0% 50%; }
+    50%      { background-position: 100% 50%; }
+}
+@keyframes sm-pulse {
+    0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(0, 230, 138, 0.55); }
+    55%      { opacity: 0.55; box-shadow: 0 0 0 6px rgba(0, 230, 138, 0); }
+}
+
+/* 모션 최소화 설정 존중(접근성) */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
 }
 </style>
 """, unsafe_allow_html=True)
+
+# ─── BGM: 우주 분위기 절차적 생성 음악 (Web Audio API, 외부 파일/저작권 이슈 없음) ───
+# iframe 안의 순수 JS로 버튼 클릭(=사용자 제스처)에서만 오디오를 시작하므로 브라우저
+# 자동재생 정책과 충돌하지 않는다. Streamlit이 매 rerun마다 이 컴포넌트를 다시 그려도
+# HTML 내용이 그대로면 프론트엔드가 동일 iframe을 재사용해 재생이 끊기지 않는다.
+_BGM_HTML = """
+<div style="font-family:'Space Grotesk',sans-serif; color:#EDEBF5; background:transparent;">
+  <div style="display:flex; gap:6px; margin-bottom:8px;">
+    <button id="sm-btn-off" class="sm-bgm-btn active" onclick="smSetMode('off')">🔇 Off</button>
+    <button id="sm-btn-calm" class="sm-bgm-btn" onclick="smSetMode('calm')">🌙 Calm</button>
+    <button id="sm-btn-energetic" class="sm-bgm-btn" onclick="smSetMode('energetic')">⚡ Energetic</button>
+  </div>
+  <div style="display:flex; align-items:center; gap:8px;">
+    <div class="sm-eq" id="sm-eq"><span></span><span></span><span></span><span></span></div>
+    <input id="sm-vol" type="range" min="0" max="0.35" step="0.01" value="0.16"
+           style="flex:1; accent-color:#A78BFA;">
+  </div>
+</div>
+<style>
+  .sm-bgm-btn {
+    flex: 1; padding: 6px 4px; font-size: 0.72rem; font-weight: 600;
+    color: #C9C4DB; background: rgba(167,139,250,0.07);
+    border: 1px solid rgba(167,139,250,0.18); border-radius: 9px;
+    cursor: pointer; transition: transform .25s cubic-bezier(.34,1.56,.64,1),
+    background .18s ease, border-color .18s ease, color .18s ease;
+  }
+  .sm-bgm-btn:hover { transform: translateY(-1px) scale(1.04); border-color: rgba(167,139,250,0.5); }
+  .sm-bgm-btn:active { transform: scale(0.93); }
+  .sm-bgm-btn.active {
+    background: linear-gradient(135deg, #7C3AED, #9F5BFF); color: #fff; border-color: transparent;
+  }
+  .sm-eq { display:flex; align-items:flex-end; gap:2px; height:16px; }
+  .sm-eq span {
+    width:3px; height:4px; background:#A78BFA; border-radius:2px;
+    animation: sm-eq-bounce 1s ease-in-out infinite; animation-play-state: paused; opacity: 0.35;
+  }
+  .sm-eq.playing span { animation-play-state: running; opacity: 1; }
+  .sm-eq span:nth-child(1){animation-duration:.8s} .sm-eq span:nth-child(2){animation-duration:1.1s}
+  .sm-eq span:nth-child(3){animation-duration:.7s} .sm-eq span:nth-child(4){animation-duration:1.3s}
+  @keyframes sm-eq-bounce { 0%,100%{height:4px} 50%{height:16px} }
+</style>
+<script>
+(function() {
+  const AC = window.AudioContext || window.webkitAudioContext;
+  let ctx = null, master = null, timer = null;
+
+  function ensureCtx() {
+    if (!ctx) {
+      ctx = new AC();
+      master = ctx.createGain();
+      master.gain.value = 0;
+      master.connect(ctx.destination);
+    }
+    if (ctx.state === 'suspended') ctx.resume();
+  }
+
+  function vol() { return parseFloat(document.getElementById('sm-vol').value); }
+
+  function note(freq, dur, type, gainVal, filterFreq) {
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    osc.type = type; osc.frequency.value = freq;
+    const g = ctx.createGain(); g.gain.value = 0;
+    const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = filterFreq || 2200;
+    osc.connect(f); f.connect(g); g.connect(master);
+    g.gain.linearRampToValueAtTime(gainVal, now + 0.06);
+    g.gain.exponentialRampToValueAtTime(0.0008, now + dur);
+    osc.start(now); osc.stop(now + dur + 0.05);
+  }
+
+  function stopAll() {
+    if (timer) { clearInterval(timer); timer = null; }
+    if (master) master.gain.setTargetAtTime(0, ctx.currentTime, 0.5);
+    document.getElementById('sm-eq').classList.remove('playing');
+  }
+
+  function startCalm() {
+    ensureCtx();
+    master.gain.setTargetAtTime(vol(), ctx.currentTime, 0.8);
+    const scale = [130.81, 155.56, 174.61, 196.00, 233.08, 261.63];
+    if (timer) clearInterval(timer);
+    const play = () => {
+      const f = scale[Math.floor(Math.random() * scale.length)];
+      note(f, 3.4, 'sine', 0.85, 900);
+      note(f * 2, 3.0, 'sine', 0.3, 1600);
+      if (Math.random() < 0.35) note(f * 4, 1.8, 'triangle', 0.22, 3400);
+    };
+    play();
+    timer = setInterval(play, 1900);
+    document.getElementById('sm-eq').classList.add('playing');
+  }
+
+  function startEnergetic() {
+    ensureCtx();
+    master.gain.setTargetAtTime(vol(), ctx.currentTime, 0.3);
+    const root = 110;
+    const arp = [1, 1.2, 1.5, 2, 1.5, 1.2];
+    if (timer) clearInterval(timer);
+    let step = 0;
+    timer = setInterval(() => {
+      note(root, 0.14, 'square', 0.7, 700);
+      if (step % 2 === 0) {
+        const ratio = arp[(step / 2) % arp.length];
+        note(root * 2 * ratio, 0.16, 'sawtooth', 0.4, 2400);
+      }
+      step++;
+    }, 150);
+    document.getElementById('sm-eq').classList.add('playing');
+  }
+
+  window.smSetMode = function(mode) {
+    document.querySelectorAll('.sm-bgm-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('sm-btn-' + mode).classList.add('active');
+    if (mode === 'off') stopAll();
+    else if (mode === 'calm') startCalm();
+    else if (mode === 'energetic') startEnergetic();
+  };
+
+  document.getElementById('sm-vol').addEventListener('input', () => {
+    if (master && ctx) master.gain.setTargetAtTime(vol(), ctx.currentTime, 0.1);
+  });
+})();
+</script>
+"""
 
 # Neon(무료 Postgres) 등 st.secrets["DATABASE_URL"]이 설정돼 있으면 자동으로 영구 저장
 # 백엔드로 전환된다(storage.py는 streamlit 비의존이라 여기서 값을 주입해준다).
@@ -86,7 +381,7 @@ def _login_db_path(name: str, pw: str) -> str:
 # 이름+비밀번호로 로그인/회원가입. 비밀번호는 scrypt로 해시 저장(users 테이블)해
 # 진짜 검증이 이뤄진다 — 오타로 새 빈 계정이 생기는 일이 없다.
 if "db_path" not in st.session_state:
-    st.title("📈 StockManager")
+    st.title("StockManager")
     st.caption("이름과 비밀번호로 내 데이터를 분리·보호합니다. 친구와 다른 이름을 쓰면 "
                "서로의 기록이 보이지 않습니다. (※ 민감정보 입력 금지)")
     tab_login, tab_signup = st.tabs(["🔐 로그인", "✨ 회원가입"])
@@ -288,8 +583,43 @@ def show_chart_analysis(sym: str):
 
 
 # ---------------------------------------------------------------- 사이드바
-st.sidebar.title("📈 StockManager")
+st.sidebar.title("StockManager")
 st.sidebar.caption(f"👤 {st.session_state.get('user_name','')} 님의 워크벤치")
+
+
+# 주요 지수 스트립 — 어떤 페이지에서든 차트와 함께 항상 보이는 시장 온도계
+@st.cache_data(ttl=60, show_spinner=False)
+def cached_indices():
+    return MK.get_market_indices()
+
+
+with st.sidebar:
+    @st.fragment(run_every="60s")
+    def _indices_strip():
+        rows_html = []
+        for ix in cached_indices():
+            price, chg = ix["price"], ix["change_pct"]
+            if price is None:
+                continue
+            cls = "up" if (chg or 0) >= 0 else "down"
+            arrow = "▲" if (chg or 0) >= 0 else "▼"
+            chg_txt = f"{arrow} {abs(chg):.2f}%" if chg is not None else ""
+            rows_html.append(
+                f'<div class="row"><span class="name">{ix["name"]}</span>'
+                f'<span class="val {cls}">{price:,.2f}&nbsp;<small>{chg_txt}</small>'
+                f'</span></div>')
+        if rows_html:
+            st.markdown(
+                '<div class="sm-indices">'
+                '<div class="row"><span class="name"><span class="sm-live-dot">'
+                '</span>MARKET</span></div>' + "".join(rows_html) + "</div>",
+                unsafe_allow_html=True)
+
+    _indices_strip()
+
+with st.sidebar.expander("🎧 BGM (우주 분위기 음악)", expanded=False):
+    st.caption("취향에 맞게 골라보세요 — 버튼을 누르면 재생됩니다(자동재생 정책).")
+    st.components.v1.html(_BGM_HTML, height=70)
 
 with st.sidebar.expander("👤 계정 / 데이터 백업", expanded=False):
     st.caption("이 앱은 휘발성 환경에 배포될 수 있습니다. 중요한 기록은 가끔 "
@@ -324,12 +654,12 @@ with st.sidebar.expander("📄 엑셀 내보내기", expanded=False):
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             use_container_width=True)
 
-with st.sidebar.expander("➕ 종목 추가", expanded=False):
-    new_sym = st.text_input("티커 (예: SOFI)", key="new_sym").upper().strip()
-    new_kind = st.radio("분류", ["long", "swing"], horizontal=True,
-                        format_func=lambda k: "장기" if k == "long" else "스윙",
+with st.sidebar.expander("➕ Add Ticker", expanded=False):
+    new_sym = st.text_input("Ticker", key="new_sym").upper().strip()
+    new_kind = st.radio("Type", ["long", "swing"], horizontal=True,
+                        format_func=lambda k: "Long" if k == "long" else "Swing",
                         key="new_kind")
-    if st.button("추가", use_container_width=True) and new_sym:
+    if st.button("추가", type="primary", use_container_width=True) and new_sym:
         f = cached_fundamentals(new_sym)
         if f.get("price") is None and f.get("market_cap") is None:
             st.error(f"'{new_sym}' 시세를 찾을 수 없습니다. 티커를 확인하세요.")
@@ -372,7 +702,7 @@ st.sidebar.caption("데이터: Yahoo Finance (무료, 실시간~15분 지연). "
 
 # ================================================================ 대시보드
 def render_dashboard():
-    st.title("📊 포트폴리오 대시보드")
+    st.title("포트폴리오 대시보드")
     if not tickers:
         st.info("사이드바에서 종목을 추가하면 여기에 표시됩니다.")
         return
@@ -399,26 +729,26 @@ def render_dashboard():
         # NumberColumn은 결측값을 "None" 텍스트로 그대로 보여줌(glide-data-grid 특성) —
         # 미보유 종목처럼 값이 없는 게 정상인 열은 미리 "—"로 포맷한 문자열로 넣는다.
         rows.append({
-            "티커": sym,
-            "분류": "장기" if t["kind"] == "long" else "스윙",
-            "현재가": price,
-            "등락%": q.get("change_pct"),
-            "30일 추이": spark,
-            "점수": total,
-            "판정": verdict,
-            "보유주": f"{pos['shares']:.0f}" if pos["shares"] else "—",
-            "평단": fmt_money(pos["avg_price"]) if pos["shares"] else "—",
-            "평가액": fmt_money(mkt_val),
-            "손익%": f"{pl_pct:+.2f}%" if pl_pct is not None else "—",
+            "Ticker": sym,
+            "Type": "Long" if t["kind"] == "long" else "Swing",
+            "Price": price,
+            "Change %": q.get("change_pct"),
+            "30D Trend": spark,
+            "Score": total,
+            "Verdict": verdict,
+            "Shares": f"{pos['shares']:.0f}" if pos["shares"] else "—",
+            "Avg Cost": fmt_money(pos["avg_price"]) if pos["shares"] else "—",
+            "Value": fmt_money(mkt_val),
+            "P/L %": f"{pl_pct:+.2f}%" if pl_pct is not None else "—",
         })
     df = pd.DataFrame(rows)
 
     # 요약 메트릭
     c1, c2, c3 = st.columns(3)
-    c1.metric("등록 종목", f"{len(rows)} 개")
-    c2.metric("보유 평가액", fmt_money(invested) if invested else "—")
-    scored = [r["점수"] for r in rows if r["점수"] is not None]
-    c3.metric("평균 점수", f"{sum(scored)/len(scored):.1f}" if scored else "—")
+    c1.metric("Watchlist", f"{len(rows)} 종목")
+    c2.metric("Portfolio Value", fmt_money(invested) if invested else "—")
+    scored = [r["Score"] for r in rows if r["Score"] is not None]
+    c3.metric("Avg Score", f"{sum(scored)/len(scored):.1f}" if scored else "—")
 
     st.caption("💡 표에서 종목 행을 클릭하면 해당 종목 상세로 바로 이동합니다.")
     dk = st.session_state.get("_dash_key", 0)
@@ -428,15 +758,15 @@ def render_dashboard():
         on_select="rerun", selection_mode="single-row",
         key=f"dash_table_{dk}",
         column_config={
-            "현재가": st.column_config.NumberColumn(format="$%.2f"),
-            "등락%": st.column_config.NumberColumn(format="%.2f%%"),
-            "30일 추이": st.column_config.LineChartColumn(width="small"),
-            "점수": st.column_config.ProgressColumn(min_value=0, max_value=100,
-                                                  format="%.1f"),
+            "Price": st.column_config.NumberColumn(format="$%.2f"),
+            "Change %": st.column_config.NumberColumn(format="%.2f%%"),
+            "30D Trend": st.column_config.LineChartColumn(width="small"),
+            "Score": st.column_config.ProgressColumn(min_value=0, max_value=100,
+                                                   format="%.1f"),
         },
     )
     if event.selection.rows:
-        st.session_state["_goto_symbol"] = df.iloc[event.selection.rows[0]]["티커"]
+        st.session_state["_goto_symbol"] = df.iloc[event.selection.rows[0]]["Ticker"]
         st.session_state["_nav_detail"] = True
         st.session_state["_dash_key"] = dk + 1  # 선택 초기화(재진입 시 무한 이동 방지)
         st.rerun()
@@ -455,9 +785,9 @@ def render_detail(sym: str):
     h1, h2, h3, h4 = st.columns([3, 1.2, 1.2, 1.2])
     h1.title(f"{sym}")
     h1.caption(f"{f.get('name','')} · {f.get('sector') or ''} / {f.get('industry') or ''}")
-    h2.metric("현재가", fmt_money(price), f"{chg:.2f}%" if chg is not None else None)
-    h3.metric("시가총액", fmt_money(f.get("market_cap")))
-    h4.metric("애널 목표가", fmt_money(f.get("target_mean")))
+    h2.metric("Price", fmt_money(price), f"{chg:.2f}%" if chg is not None else None)
+    h3.metric("Market Cap", fmt_money(f.get("market_cap")))
+    h4.metric("Target Price", fmt_money(f.get("target_mean")))
 
     tabs = st.tabs(["📈 개요/Live", "📋 스코어카드", "🧮 밸류에이션·DCF",
                     "🎯 시나리오", "📰 뉴스·Narrative", "🗒️ 촉매 반영", "💰 매매기록"])
@@ -491,17 +821,17 @@ _LINE_INTERVAL = {"1D": "1m", "1W": "15m", "1M": "60m", "3M": "1d", "6M": "1d",
                   "1Y": "1d", "2Y": "1wk", "5Y": "1wk", "10Y": "1mo", "MAX": "1mo"}
 # 캔들 종류별 기본 기간 선택지
 _RANGE_OPTS = {
-    "라인": ["1D", "1W", "1M", "3M", "1Y", "5Y", "10Y", "MAX"],
-    "일봉": ["3M", "6M", "1Y", "2Y", "5Y", "10Y", "MAX"],
-    "주봉": ["1Y", "2Y", "5Y", "10Y", "MAX"],
-    "월봉": ["5Y", "10Y", "MAX"],
+    "Line": ["1D", "1W", "1M", "3M", "1Y", "5Y", "10Y", "MAX"],
+    "Daily": ["3M", "6M", "1Y", "2Y", "5Y", "10Y", "MAX"],
+    "Weekly": ["1Y", "2Y", "5Y", "10Y", "MAX"],
+    "Monthly": ["5Y", "10Y", "MAX"],
 }
-_CANDLE_INTERVAL = {"일봉": "1d", "주봉": "1wk", "월봉": "1mo"}
+_CANDLE_INTERVAL = {"Daily": "1d", "Weekly": "1wk", "Monthly": "1mo"}
 
 
 def _resolve_period_interval(gran: str, rng: str):
     yperiod = _PERIOD_YH.get(rng, "1y")
-    if gran == "라인":
+    if gran == "Line":
         return yperiod, _LINE_INTERVAL.get(rng, "1d"), "line"
     return yperiod, _CANDLE_INTERVAL.get(gran, "1d"), "candle"
 
@@ -519,23 +849,23 @@ def render_chart(sym: str):
                   help="차트 보는 법 설명"):
         show_guide("chart")
     c1, c2, c3, c4 = st.columns([2.0, 3.0, 1.3, 1.3])
-    gran = c1.segmented_control("차트 종류", ["라인", "일봉", "주봉", "월봉"],
-                                default="라인", key=f"gran_{sym}") or "라인"
+    gran = c1.segmented_control("Chart", ["Line", "Daily", "Weekly", "Monthly"],
+                                default="Line", key=f"gran_{sym}") or "Line"
     opts = _RANGE_OPTS[gran]
-    default_rng = opts[len(opts) // 2] if gran != "라인" else "1Y"
-    rng = c2.segmented_control("기간", opts, default=default_rng,
+    default_rng = opts[len(opts) // 2] if gran != "Line" else "1Y"
+    rng = c2.segmented_control("Range", opts, default=default_rng,
                                key=f"rng_{sym}") or opts[0]
-    dynamic = c3.toggle("✨ 다이나믹", value=_TV_AVAILABLE, key=f"dyn_{sym}",
+    dynamic = c3.toggle("✨ Dynamic", value=_TV_AVAILABLE, key=f"dyn_{sym}",
                         disabled=not _TV_AVAILABLE,
                         help="증권앱 느낌의 부드러운 실시간 차트(TradingView). "
                              "끄면 기존 분석용 차트(plotly)로 봅니다.") if _TV_AVAILABLE else False
-    live = c4.toggle("🔴 실시간", key=f"live_{sym}",
+    live = c4.toggle("🔴 Live", key=f"live_{sym}",
                      help="30초마다 차트만 자동 갱신 (전체 새로고침 없음)")
 
     yperiod, interval, mode = _resolve_period_interval(gran, rng)
     oc1, oc2 = st.columns(2)
     show_trend = oc1.checkbox("추세 전환 구간 · 촉매 표시", value=True, key=f"trend_{sym}")
-    show_volume = oc2.checkbox("📊 거래량 패널", value=False, key=f"vol_{sym}")
+    show_volume = oc2.checkbox("📊 Volume", value=False, key=f"vol_{sym}")
 
     refresh = "30s" if live else None
 
@@ -794,10 +1124,10 @@ def render_valuation(sym, f, price):
         try:
             iv = V.intrinsic_value(a)
             mos = V.margin_of_safety(iv["per_share"], price) if price else None
-            st.metric("주당 내재가치", fmt_money(iv["per_share"]))
-            st.metric("기업가치(EV)", fmt_money(iv["enterprise_value"]))
+            st.metric("Intrinsic Value / Share", fmt_money(iv["per_share"]))
+            st.metric("Enterprise Value", fmt_money(iv["enterprise_value"]))
             if mos is not None:
-                st.metric("안전마진 (vs 현재가)", f"{mos*100:.1f}%",
+                st.metric("Margin of Safety", f"{mos*100:.1f}%",
                           delta="저평가" if mos > 0 else "고평가")
         except ValueError as e:
             st.error(str(e))
@@ -811,7 +1141,7 @@ def render_valuation(sym, f, price):
             if g_impl is None:
                 st.warning("역산 불가 (음수 FCF이거나 합리적 범위 내 해 없음).")
             else:
-                st.metric("내재 FCF 성장률", f"{g_impl*100:.1f}% / 년",
+                st.metric("Implied FCF Growth", f"{g_impl*100:.1f}% / 년",
                           help="입력한 고성장 연수 동안 시장이 가정 중인 성장률")
                 gap = g_impl - growth
                 if gap > 0.02:
@@ -855,7 +1185,7 @@ def render_peer_comparison(sym, f):
             peers.append(p)
 
     def _row(symbol, data, is_self):
-        return {"티커": ("⭐ " + symbol) if is_self else symbol,
+        return {"Ticker": ("⭐ " + symbol) if is_self else symbol,
                 "Fwd P/E": data.get("forward_pe"), "P/E": data.get("trailing_pe"),
                 "PBR": data.get("price_to_book"), "PSR": data.get("price_to_sales"),
                 "EV/EBITDA": data.get("ev_ebitda")}
@@ -900,8 +1230,8 @@ def render_peer_comparison(sym, f):
 
         bars = [r for r in rows if r["Fwd P/E"]]
         fig = go.Figure(go.Bar(
-            x=[r["티커"] for r in bars], y=[r["Fwd P/E"] for r in bars],
-            marker_color=[CH.GREEN if r["티커"].startswith("⭐") else "#7AA2FF"
+            x=[r["Ticker"] for r in bars], y=[r["Fwd P/E"] for r in bars],
+            marker_color=[CH.GREEN if r["Ticker"].startswith("⭐") else CH.SMA_SHORT
                           for r in bars],
             text=[f"{r['Fwd P/E']:.1f}x" for r in bars], textposition="outside"))
         fig.add_hline(y=med, line_dash="dash", line_color="white",
@@ -1013,8 +1343,8 @@ def render_scenarios(sym, f, price):
 
             cv = SN.case_valuation(c, hy, price, shares)
             r1, r2, r3 = st.columns(3)
-            r1.metric(f"{c['name']} 목표주가", fmt_money(cv["target_price"]))
-            r2.metric("업사이드",
+            r1.metric(f"{c['name']} Target", fmt_money(cv["target_price"]))
+            r2.metric("Upside",
                       f"{cv['upside']*100:+.1f}%" if cv["upside"] is not None else "—",
                       delta="상승" if (cv["upside"] or 0) > 0 else
                       ("하락" if cv["upside"] is not None else None))
@@ -1046,8 +1376,8 @@ def render_scenarios(sym, f, price):
     priced = [cv for cv in summary["cases"] if cv["target_price"] is not None]
     if priced:
         st.markdown("**케이스 비교**")
-        _COLOR_HEX = {"red": CH.RED, "orange": "#FFB020", "green": CH.GREEN,
-                      "violet": "#B388FF", "blue": "#7AA2FF", "gray": "#888"}
+        _COLOR_HEX = {"red": CH.RED, "orange": CH.SMA_LONG, "green": CH.GREEN,
+                      "violet": "#A78BFA", "blue": CH.SMA_SHORT, "gray": "#888"}
         fig = go.Figure(go.Bar(
             x=[cv["name"] for cv in priced],
             y=[cv["target_price"] for cv in priced],
@@ -1060,15 +1390,15 @@ def render_scenarios(sym, f, price):
                           annotation_position="top left")
         fig.update_layout(template="plotly_dark", height=340,
                           margin=dict(l=0, r=0, t=10, b=0),
-                          yaxis_title="목표주가 ($)",
+                          yaxis_title="Target Price ($)",
                           paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
         st.plotly_chart(fig, use_container_width=True, key=f"scn_bar_{sym}")
 
         bt = summary["blended_target"]
         b1, b2, b3 = st.columns(3)
-        b1.metric("확률가중 기대 목표주가", fmt_money(bt),
-                  help="목표주가가 있는 케이스를 확률로 가중평균")
-        b2.metric("기대 업사이드",
+        b1.metric("Blended Target Price", fmt_money(bt),
+                  help="목표주가가 있는 케이스를 확률로 가중평균(확률가중 기대 목표주가)")
+        b2.metric("Expected Upside",
                   f"{summary['blended_upside']*100:+.1f}%"
                   if summary["blended_upside"] is not None else "—")
         ps = summary["prob_sum"]
@@ -1078,16 +1408,16 @@ def render_scenarios(sym, f, price):
             b3.success("확률 합 = 1.00 ✓")
 
         cmp_df = pd.DataFrame([{
-            "케이스": cv["name"], "확률": cv["prob"],
-            "목표주가": cv["target_price"],
-            "업사이드%": (cv["upside"] * 100 if cv["upside"] is not None else None),
+            "Case": cv["name"], "Prob": cv["prob"],
+            "Target": cv["target_price"],
+            "Upside %": (cv["upside"] * 100 if cv["upside"] is not None else None),
             "코멘트": cv["comment"],
         } for cv in summary["cases"]])
         st.dataframe(cmp_df, use_container_width=True, hide_index=True,
                      column_config={
-                         "확률": st.column_config.NumberColumn(format="%.2f"),
-                         "목표주가": st.column_config.NumberColumn(format="$%.2f"),
-                         "업사이드%": st.column_config.NumberColumn(format="%.1f%%"),
+                         "Prob": st.column_config.NumberColumn(format="%.2f"),
+                         "Target": st.column_config.NumberColumn(format="$%.2f"),
+                         "Upside %": st.column_config.NumberColumn(format="%.1f%%"),
                      })
     else:
         st.info("EPS 또는 매출 드라이버에 exit 멀티플을 넣으면 목표주가가 계산됩니다.")
@@ -1109,20 +1439,20 @@ def render_narrative(sym, price):
     narr = NA.news_narrative(news)
     n1, n2, n3 = st.columns(3)
     if narr["available"]:
-        n1.metric("뉴스 버즈", f"{narr['buzz']}/100", help="수집 한도 대비 현재 노출량")
-        n2.metric("헤드라인 톤", f"{narr['sentiment']:+d}", narr["label"],
+        n1.metric("News Buzz", f"{narr['buzz']}/100", help="수집 한도 대비 현재 노출량")
+        n2.metric("Headline Tone", f"{narr['sentiment']:+d}", narr["label"],
                   help="-100(매우부정)~+100(매우긍정)")
     else:
-        n1.metric("뉴스 버즈", "—")
-        n2.metric("헤드라인 톤", "—")
+        n1.metric("News Buzz", "—")
+        n2.metric("Headline Tone", "—")
 
     recs = cached_analyst_recs(sym)
     am = NA.analyst_momentum(recs)
     if am["available"]:
-        n3.metric("애널리스트 모멘텀", am["trend"], f"{am['delta']:+.2f}",
+        n3.metric("Analyst Momentum", am["trend"], f"{am['delta']:+.2f}",
                   help="최근 수개월 컨센서스 변화(+면 강세로 이동)")
     else:
-        n3.metric("애널리스트 모멘텀", "—")
+        n3.metric("Analyst Momentum", "—")
 
     si = cached_search_interest(sym)
     if si:
@@ -1219,14 +1549,14 @@ def render_trades(sym, price):
     pos = ST.position_summary(sym, db_path=current_db())
     if pos["shares"] > 0:
         p1, p2, p3, p4 = st.columns(4)
-        p1.metric("보유 수량", f"{pos['shares']:.0f}")
-        p2.metric("평균 단가", fmt_money(pos["avg_price"]))
+        p1.metric("Shares", f"{pos['shares']:.0f}")
+        p2.metric("Avg Cost", fmt_money(pos["avg_price"]))
         cur_val = pos["shares"] * price if price else None
-        p3.metric("평가액", fmt_money(cur_val))
+        p3.metric("Market Value", fmt_money(cur_val))
         if price and pos["avg_price"]:
             pl = (price - pos["avg_price"]) * pos["shares"]
             pl_pct = (price - pos["avg_price"]) / pos["avg_price"] * 100
-            p4.metric("평가손익", fmt_money(pl), f"{pl_pct:.1f}%")
+            p4.metric("Unrealized P/L", fmt_money(pl), f"{pl_pct:.1f}%")
 
     trades = ST.list_trades(sym, db_path=current_db())
     if trades:
@@ -1248,7 +1578,7 @@ def render_trades(sym, price):
 
 # ============================================================ 스캐너 + 알림
 def render_scanner():
-    st.title("🔎 워치리스트 스캐너")
+    st.title("워치리스트 스캐너")
     st.caption("전체 종목을 한 번에 스캔 — 점수·판정·밸류에이션·현재 추세와 "
                "최근 추세 전환(알림)을 표로 봅니다. (일봉 SMA 기준)")
     if not tickers:
@@ -1275,14 +1605,14 @@ def render_scanner():
             rec_txt = (f"{'▲' if rec['type']=='up' else '▼'} "
                        f"{rec['bars_ago']}봉 전 전환")
         rows.append({
-            "티커": sym,
-            "분류": "장기" if t["kind"] == "long" else "스윙",
-            "현재가": q.get("price"),
-            "등락%": q.get("change_pct"),
-            "점수": total,
-            "판정": verdict,
+            "Ticker": sym,
+            "Type": "Long" if t["kind"] == "long" else "Swing",
+            "Price": q.get("price"),
+            "Change %": q.get("change_pct"),
+            "Score": total,
+            "Verdict": verdict,
             "Fwd P/E": f.get("forward_pe"),
-            "추세": trend_txt,
+            "Trend": trend_txt,
             "최근 전환": rec_txt,
         })
 
@@ -1301,9 +1631,9 @@ def render_scanner():
 
     df = pd.DataFrame(rows)
     st.dataframe(df, use_container_width=True, hide_index=True, column_config={
-        "현재가": st.column_config.NumberColumn(format="$%.2f"),
-        "등락%": st.column_config.NumberColumn(format="%.2f%%"),
-        "점수": st.column_config.ProgressColumn(min_value=0, max_value=100, format="%.1f"),
+        "Price": st.column_config.NumberColumn(format="$%.2f"),
+        "Change %": st.column_config.NumberColumn(format="%.2f%%"),
+        "Score": st.column_config.ProgressColumn(min_value=0, max_value=100, format="%.1f"),
         "Fwd P/E": st.column_config.NumberColumn(format="%.1f"),
     })
     st.caption("추세: 일봉 SMA20 vs SMA50 · 점수 ≥70 매수 / 60~70 소액 / <60 보류")

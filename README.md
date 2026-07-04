@@ -150,8 +150,10 @@ python test_app_smoke.py   # 앱 렌더링 예외 검증(회원가입·로그인
 ```
 
 ## 테마
-`.streamlit/config.toml` 에 Robinhood풍 다크 테마(검정 배경 + 그린 #00C805) 적용.
-색을 바꾸려면 이 파일을 수정하세요.
+`.streamlit/config.toml` 에 Purple × Dark 테마(서피스 #0D0A14 + 액센트 #A78BFA) 적용.
+색을 바꾸려면 이 파일을 수정하세요. 우주/행성 배경, 통통 튀는 버튼·카드 애니메이션, 사이드바
+🎧 BGM(Web Audio API로 절차적 생성 — 외부 음원 파일 없음, Off/Calm/Energetic 선택) 등
+UI/UX 디테일은 `app.py` 상단 CSS 블록과 `_BGM_HTML`을 참고하세요.
 
 ## 면책
 데이터는 정보 제공 목적이며 투자 권유가 아닙니다. yfinance 데이터에는 지연·오류가
