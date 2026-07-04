@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import datetime as dt
+import time
 import uuid
 
 import pandas as pd
@@ -131,6 +132,15 @@ button[kind="secondary"]:active, button[data-testid="stBaseButton-secondary"]:ac
     transition: transform 0.08s ease !important;
 }
 
+/* ── 버튼 공통(꾹 눌림): 종류 상관없이 모든 버튼(다운로드/익스팬더/사이드바 접기 등 포함) ── */
+button {
+    transition: transform 0.25s cubic-bezier(.34,1.56,.64,1);
+}
+button:active {
+    transform: scale(0.93) !important;
+    transition: transform 0.08s ease !important;
+}
+
 /* ── 사이드바: 미묘한 퍼플 그라디언트 배경 ── */
 section[data-testid="stSidebar"] > div {
     background: linear-gradient(180deg, #131022 0%, #0D0A14 45%);
@@ -192,6 +202,18 @@ div[role="progressbar"] > div { transition: width 0.6s ease; }
     border-radius: 8px;
 }
 ::-webkit-scrollbar-thumb:hover { background: rgba(167, 139, 250, 0.45); }
+
+/* ── Ticker 입력창: 명확한 박스 경계선 ── */
+div[data-testid="stTextInputRootElement"]:has(input[aria-label="Ticker"]) {
+    border: 1.5px solid rgba(167, 139, 250, 0.5) !important;
+    border-radius: 10px !important;
+    background: rgba(167, 139, 250, 0.05);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+div[data-testid="stTextInputRootElement"]:has(input[aria-label="Ticker"]):focus-within {
+    border-color: var(--sm-accent) !important;
+    box-shadow: 0 0 0 3px rgba(167, 139, 250, 0.18);
+}
 
 /* ── 사이드바 지수 스트립 ── */
 .sm-indices {
@@ -358,6 +380,100 @@ _BGM_HTML = """
 </script>
 """
 
+# ─── 로그인/회원가입 성공 시 전체화면 로딩 연출 (순수 HTML/CSS/SVG — JS 불필요) ───
+# 화성 느낌의 붉은 행성 + 별빛 우주 배경 위로, 위아래로 튀며 우상향하는 차트 라인이
+# SVG <animateMotion>(SMIL, 스크립트 없이 브라우저가 직접 실행)으로 그려진다.
+_CHART_PATH_D = ("M0,150 L36,110 L72,128 L108,80 L144,102 L180,58 "
+                  "L216,78 L252,34 L288,54 L324,14 L360,30 L396,-4")
+_LOGIN_LOADING_HTML = f"""
+<div class="sm-loading-overlay">
+  <div class="sm-loading-planet"></div>
+  <svg class="sm-loading-chart" viewBox="0 -20 400 176" preserveAspectRatio="none">
+    <defs>
+      <linearGradient id="sm-chart-grad" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0%" stop-color="#FF8A65"/>
+        <stop offset="50%" stop-color="#A78BFA"/>
+        <stop offset="100%" stop-color="#00E68A"/>
+      </linearGradient>
+    </defs>
+    <path d="{_CHART_PATH_D}" fill="none" stroke="url(#sm-chart-grad)"
+          stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"
+          pathLength="1000" class="sm-loading-path"/>
+    <circle r="6" fill="#EDEBF5" class="sm-loading-dotmark">
+      <animateMotion dur="2.4s" repeatCount="indefinite" path="{_CHART_PATH_D}"/>
+    </circle>
+  </svg>
+  <div class="sm-loading-text">차트를 생성중입니다<span class="sm-loading-dot">.</span><span class="sm-loading-dot">.</span><span class="sm-loading-dot">.</span></div>
+</div>
+<style>
+  .sm-loading-overlay {{
+      position: fixed; inset: 0; z-index: 99999;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      background: radial-gradient(ellipse at 25% 15%, rgba(167,139,250,0.20), transparent 55%),
+                  radial-gradient(ellipse at 82% 88%, rgba(255,111,74,0.14), transparent 55%),
+                  #0A0812;
+      overflow: hidden;
+  }}
+  .sm-loading-overlay::before {{
+      content: ""; position: absolute; inset: 0; pointer-events: none;
+      background-image:
+          radial-gradient(1.6px 1.6px at 18% 24%, rgba(255,255,255,0.85), transparent),
+          radial-gradient(1px 1px at 55% 68%, rgba(255,255,255,0.6), transparent),
+          radial-gradient(1.6px 1.6px at 78% 15%, rgba(167,139,250,0.9), transparent),
+          radial-gradient(1px 1px at 30% 82%, rgba(255,255,255,0.5), transparent),
+          radial-gradient(1.6px 1.6px at 88% 55%, rgba(255,138,101,0.7), transparent),
+          radial-gradient(1px 1px at 8% 55%, rgba(255,255,255,0.5), transparent);
+      background-repeat: repeat; background-size: 300px 300px;
+      animation: sm-loading-twinkle 3.2s ease-in-out infinite alternate;
+  }}
+  .sm-loading-planet {{
+      position: absolute; top: 10%; right: 10%;
+      width: 200px; height: 200px; border-radius: 50%;
+      background: radial-gradient(circle at 35% 30%, #FFA679 0%, #C1502C 48%, #6E2410 78%, #3c1207 100%);
+      box-shadow: 0 0 70px 12px rgba(255, 111, 74, 0.32), inset -18px -18px 40px rgba(0,0,0,0.4);
+      animation: sm-loading-drift 5s ease-in-out infinite;
+  }}
+  .sm-loading-chart {{
+      width: min(72vw, 560px); height: 200px; margin-bottom: 30px;
+      filter: drop-shadow(0 0 12px rgba(167, 139, 250, 0.55));
+  }}
+  .sm-loading-path {{
+      stroke-dasharray: 1000; stroke-dashoffset: 1000;
+      animation: sm-loading-draw 2.4s ease-in-out infinite;
+  }}
+  .sm-loading-text {{
+      font-family: 'Space Grotesk', sans-serif; color: #EDEBF5;
+      font-size: 1.35rem; letter-spacing: 0.02em;
+  }}
+  .sm-loading-dot {{ display: inline-block; opacity: 0; animation: sm-loading-dotblink 1.4s infinite; }}
+  .sm-loading-dot:nth-child(2) {{ animation-delay: 0.25s; }}
+  .sm-loading-dot:nth-child(3) {{ animation-delay: 0.5s; }}
+  @keyframes sm-loading-twinkle {{ from {{ opacity: 0.5; }} to {{ opacity: 1; }} }}
+  @keyframes sm-loading-drift {{
+      0%, 100% {{ transform: translate(0, 0) scale(1); }}
+      50%      {{ transform: translate(-3%, 4%) scale(1.04); }}
+  }}
+  @keyframes sm-loading-draw {{
+      0%   {{ stroke-dashoffset: 1000; }}
+      65%  {{ stroke-dashoffset: 0; }}
+      100% {{ stroke-dashoffset: 0; }}
+  }}
+  @keyframes sm-loading-dotblink {{
+      0%, 80%, 100% {{ opacity: 0; }}
+      40%           {{ opacity: 1; }}
+  }}
+</style>
+"""
+
+
+def _play_login_loading():
+    """로그인/회원가입 성공 직후 잠깐 보여주는 우주·화성 컨셉 로딩 연출.
+    stroke-dasharray/animateMotion(SMIL)만으로 그려서 별도 JS 컴포넌트 없이 st.markdown으로 충분."""
+    _ph = st.empty()
+    _ph.markdown(_LOGIN_LOADING_HTML, unsafe_allow_html=True)
+    time.sleep(2.1)
+    _ph.empty()
+
 # Neon(무료 Postgres) 등 st.secrets["DATABASE_URL"]이 설정돼 있으면 자동으로 영구 저장
 # 백엔드로 전환된다(storage.py는 streamlit 비의존이라 여기서 값을 주입해준다).
 if not ST.DATABASE_URL:
@@ -402,6 +518,7 @@ if "db_path" not in st.session_state:
                 st.session_state["user_name"] = _lname.strip()
                 st.session_state["db_path"] = _login_db_path(_lname, _lpw)
                 ST.init_db(st.session_state["db_path"])
+                _play_login_loading()
                 st.rerun()
 
     with tab_signup:
@@ -426,7 +543,7 @@ if "db_path" not in st.session_state:
                 st.session_state["user_name"] = _sname.strip()
                 st.session_state["db_path"] = _login_db_path(_sname, _spw)
                 ST.init_db(st.session_state["db_path"])
-                st.success("계정이 생성되었습니다!")
+                _play_login_loading()
                 st.rerun()
     st.stop()
 
